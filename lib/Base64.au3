@@ -1,6 +1,5 @@
 #include-once
 
-Global $B64_PADDING = '='
 Global $B64_ENCODING[65] = [ _
 'A','B','C','D','E','F','G','H', _
 'I','J','K','L','M','N','O','P', _
@@ -10,7 +9,7 @@ Global $B64_ENCODING[65] = [ _
 'o','p','q','r','s','t','u','v', _
 'w','x','y','z','0','1','2','3', _
 '4','5','6','7','8','9','-','_', _
-""]
+""] ;removed padding (usually '=')
 
 
 Func __B64_REVERSE($C)

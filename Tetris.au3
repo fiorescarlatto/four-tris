@@ -1505,8 +1505,12 @@ Func __QueueDecode($QueueData)
 	$Seed  = Dec($Seed)
 	$Hold  = Dec($Hold)
 	$Queue = StringSplit($Queue, '', 2)
+
+	;normalizes
+	If $Hold = 15 Then $Hold = -1
+	If $Hold > 7  Then $Hold = 7
 	For $Q In $Queue
-		$Q = Dec($Q)
+		$Q = Dec($Q) > 7 ? 7 : Dec($Q)
 	Next
 
 	Local  $Data[3] = [$Seed, $Hold, $Queue]
@@ -1538,6 +1542,7 @@ Func __BoardDecode($BoardData)
 	Local $Board
 
 	$S = B64_Decode($BoardData)
+	$S = _LZNTDecompress($S)
 	$S = StringMid($S&'', 3)
 
 	$Width  = StringMid($S, 1, 2)
@@ -1545,13 +1550,23 @@ Func __BoardDecode($BoardData)
 	$Board  = StringMid($S, 5)
 
 	;check data is correct lengths
-	If StringLen($Width) <> 4 Then Return
-	If StringLen($Height) <> 1 Then Return
+	If StringLen($Width)  <> 2 Then Return
+	If StringLen($Height) <> 2 Then Return
+	If Dec($Width ) <> UBound($GRID, 1) Then Return
+	If Dec($Height) <> UBound($GRID, 2) Then Return
+	If StringLen($Board) < Dec($Width)*Dec($Height) Then Return
 
-	If Dec($BoardData[0]) <> UBound($GRID, 1) Then Return
-	If Dec($BoardData[1]) <> UBound($GRID, 2) Then Return
+	$S     = StringSplit($Board, '', 2)
+	$Board = __MemCopy($GRID)
 
-	Local $Data[3] = [$Width, $Height, $Board]
+	Local $k = 0
+	For $j = 0 To UBound($GRID, 2) - 1
+		For $i = 0 To UBound($GRID, 1) - 1
+			$Board[$i][$j] = Dec($S[$k]) > 8 ? 8 : Dec($S[$k])
+			$k += 1
+		Next
+	Next
+
 	Return $Board
 EndFunc
 
@@ -1823,77 +1838,6 @@ Func FillBoardFromBitmap($Bitmap)
 
 	_WinAPI_DeleteDC($BoardDC)
 EndFunc
-Func FillBoardFromBitmap_Old($Bitmap)
-	Local $BoardDC, $Pixel
-
-	NewUndo()
-	PieceReset()
-
-	Local $i, $j
-	For $i = 0 To UBound($GRID, 1) - 1
-		For $j = 0 To UBound($GRID, 2) - 1
-			$GRID[$i][$j] = 0
-		Next
-	Next
-	$CHG = True
-
-	$BoardDC = _WinAPI_CreateCompatibleDC(0)
-	_WinAPI_SelectObject($BoardDC, $Bitmap)
-
-	Local $tSize  = _WinAPI_GetBitmapDimension($Bitmap)
-	Local $Size[2]= [DllStructGetData($tSize, 'X'), DllStructGetData($tSize, 'Y')]
-	Local $Cell   = $Size[0] / (UBound($GRID)-1)
-	Local $Offset = $Size[1] - Floor($Size[1] / $Cell) * $Cell - 1
-
-	Local $k = UBound($GRID, 2) - Floor($Size[1] / $Cell) - 1
-	If $k < 0 Then $k = 0
-
-	;ConsoleWrite($k&@LF)
-
-	For $i = 0 To UBound($GRID) - 1
-		For $j = 0 To UBound($GRID, 2) - $k - 1
-
-			If $i = UBound($GRID) - 1 Then
-				$Pixel = _WinAPI_GetPixel($BoardDC, $Size[0]-1, Floor($Offset + $j * $Cell))
-			Else
-				$Pixel = _WinAPI_GetPixel($BoardDC, Floor($i * $Cell), Floor($Offset + $j * $Cell))
-			EndIf
-			;ConsoleWrite($Pixel&@LF)
-
-			$RGB = _ColorGetRGB(BitAND($Pixel, 0x00FFFFFF))
-			$HSV = _ColorConvertRGBtoHSL($RGB)
-
-			If $HSV[2] > 45 Then
-				If $HSV[1] < 20 Then
-					$GRID[$i][$j+$k] = 8
-				Else
-					Switch $HSV[0]
-						Case 220 To 240, 0 To 15 ;red
-							$GRID[$i][$j+$k] = 5
-						Case 15 To 27 ;orange
-							$GRID[$i][$j+$k] = 6
-						Case 27 To 45 ;yellow
-							$GRID[$i][$j+$k] = 4
-						Case 45 To 100 ;green
-							$GRID[$i][$j+$k] = 3
-						Case 100 To 135 ;cyan
-							$GRID[$i][$j+$k] = 1
-						Case 135 To 175 ;blue
-							$GRID[$i][$j+$k] = 2
-						Case 175 To 220 ;magenta
-							$GRID[$i][$j+$k] = 7
-						Case Else
-							$GRID[$i][$j+$k] = 8
-					EndSwitch
-				EndIf
-			Else
-				$GRID[$i][$j+$k] = 0
-			EndIf
-		Next
-	Next
-
-	_WinAPI_DeleteDC($BoardDC)
-EndFunc
 
 
 Func GameInput()
@@ -2040,11 +1984,9 @@ Func BagRandom($Min, $Max, $Flag)
 	$BagSeed = Random(0, 65535, 1)
 	Return Random($Min, $Max, $Flag)
 EndFunc
-
 Func HoldReset()
 	$PieceH = -1
 EndFunc
-
 Func PieceReset()
 	$PieceX = Floor(UBound($GRID)/2) - 2
 	$PieceY = $GRID_H-2
@@ -2081,7 +2023,6 @@ Func PieceHold()
 	If Not $InfiniteSwaps = True Then $Swapped = True
 	Sound("hold")
 EndFunc   ;==>PieceHold
-
 Func StatsReset()
 	$ClearCombo = 0
 	$Damage  = 0
@@ -2094,7 +2035,6 @@ Func StatsReset()
 	$B2BText    = ""
 	$AttackText = ""
 EndFunc
-
 Func GridReset()
 	Local $i, $j
 
