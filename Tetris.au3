@@ -21,10 +21,10 @@
 #include <ScreenCapture.au3>
 #include <Color.au3>
 
-#include "..\..\..\Libraries\Keyboard.au3"
-#include "..\..\..\Libraries\Base64.au3"
-#include "..\..\..\Libraries\Bass.au3"
-#include "..\..\..\Libraries\LZNT.au3"
+#include "lib\Keyboard.au3"
+#include "lib\Base64.au3"
+#include "lib\Bass.au3"
+#include "lib\LZNT.au3"
 
 
 Opt("TrayIconHide", 1)
