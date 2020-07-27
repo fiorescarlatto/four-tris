@@ -2,11 +2,10 @@
 #AutoIt3Wrapper_Icon=icon.ico
 #AutoIt3Wrapper_Outfile=build\current\four-tris-x86.exe
 #AutoIt3Wrapper_Outfile_x64=build\current\four-tris-x64.exe
-#AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Compile_Both=y
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=Fio's tetris client
-#AutoIt3Wrapper_Res_Fileversion=1.4.0
+#AutoIt3Wrapper_Res_Fileversion=1.4.0.0
 #AutoIt3Wrapper_Res_Fileversion_AutoIncrement=p
 #AutoIt3Wrapper_Res_LegalCopyright=pls TTC dont sue me
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
@@ -206,9 +205,9 @@ $KEYBINDS[7 ][1] = "Rotate180"
 $KEYBINDS[8 ][1] = "clear_board"
 $KEYBINDS[9 ][1] = "GridSpawnGarbage"
 $KEYBINDS[10][1] = "GridSpawn4W"
-;$KEYBINDS[11][1] = "LoadState"
-;$KEYBINDS[12][1] = "SaveState"
-;$KEYBINDS[13][1] = @Compiled ? "" : "MoveU"
+$KEYBINDS[11][1] = "";"LoadState"
+$KEYBINDS[12][1] = "";"SaveState"
+$KEYBINDS[13][1] = "HighlightReset"
 
 $HOTKEYS [0 ][1] = "Undo"
 $HOTKEYS [1 ][1] = "Redo"
@@ -922,16 +921,28 @@ Func DrawHighlight($DRW)
 
 			If Not $HLIGHT[$i][$j] Then ContinueLoop
 
-			$Flag = $BF_MONO;$BF_MIDDLE
-			If Not BlockIsBlock($HLIGHT, $i-1, $j) Then $Flag = BitOR($Flag, $BF_LEFT)
-			If Not BlockIsBlock($HLIGHT, $i+1, $j) Then $Flag = BitOR($Flag, $BF_RIGHT)
-			If Not BlockIsBlock($HLIGHT, $i, $j-1) Then $Flag = BitOR($Flag, $BF_TOP)
-			If Not BlockIsBlock($HLIGHT, $i, $j+1) Then $Flag = BitOR($Flag, $BF_BOTTOM)
-
-			_WinAPI_DrawEdge($DRW, Rect($GridX + $i * $Cell, $GridY + ($j-$GRID_H) * $Cell, $Cell, $Cell), $EDGE_ETCHED, $Flag)
+			If Not BlockIsBlock($HLIGHT, $i-1, $j) Then DrawVEdge($DRW, $i, $j, 0, 10)
+			If Not BlockIsBlock($HLIGHT, $i+1, $j) Then DrawVEdge($DRW, $i, $j, 1, 10)
+			If Not BlockIsBlock($HLIGHT, $i, $j-1) Then DrawHEdge($DRW, $i, $j, 0, 10)
+			If Not BlockIsBlock($HLIGHT, $i, $j+1) Then DrawHEdge($DRW, $i, $j, 1, 10)
 		Next
 	Next
 EndFunc
+Func DrawHEdge($DRW, $X, $Y, $Type, $Color)
+	Local $S = 3
+	$X = $GridX + $X * $Cell
+	$Y = $GridY + ($Y-$GRID_H) * $Cell - $S + $Type * ($Cell + $S)
+	_WinAPI_FillRect($DRW, Rect($X, $Y, $Cell, $S), $Brush[$Color])
+EndFunc
+Func DrawVEdge($DRW, $X, $Y, $Type, $Color)
+	Local $S = 3
+	$X = $GridX + $X * $Cell - $S + $Type * ($Cell + $S)
+	$Y = $GridY + ($Y-$GRID_H) * $Cell
+	_WinAPI_FillRect($DRW, Rect($X, $Y, $S, $Cell), $Brush[$Color])
+EndFunc
+
+
+
 Func DrawScore($DRW)
 	Local $X
 
@@ -2112,6 +2123,14 @@ Func GridSpawn4W()
 
 	$CHG = True
 EndFunc
+Func HighlightReset()
+	For $i = 0 To UBound($HLIGHT, 1) - 1
+		For $j = 0 To UBound($HLIGHT, 2) - 1
+			$HLIGHT[$i][$j] = 0
+		Next
+	Next
+	$CHG = True
+EndFunc
 
 
 Func clear_board()
@@ -2371,8 +2390,8 @@ Func Place($Piece, $Angle, $X, $Y)
 
 	Sound("drop")
 
-	PieceNext()
 	CheckLines()
+	PieceNext()
 EndFunc
 Func CheckLines()
 	Local $Full, $Empty
@@ -2455,7 +2474,10 @@ Func CheckLines()
 		Case 1 ;cheese_race
 			If $LineClear = 0 Then GridSpawnGarbage()
 		Case 2 ;4wide
-			If $LineClear = 0 Then clear_board()
+			If $LineClear = 0 Then
+				clear_board()
+				BagReset()
+			EndIf
 			AddWide()
 		Case 3 ;pco
 	EndSwitch
