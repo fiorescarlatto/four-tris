@@ -7,10 +7,10 @@ Global $VKEY_CONVERSION[256] = [ _
 '', '', 'SPACE', 'PGUP', 'PGDN', 'END', 'HOME', 'LEFT', 'UP', 'RIGHT', _
 'DOWN', '', '', '', 'PRINTSCREEN', 'INS', 'DEL', '', '0', '1', _
 '2', '3', '4', '5', '6', '7', '8', '9', '', '', _
-'', '', '', '', '', 'a', 'b', 'c', 'd', 'e', _
-'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', _
-'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', _
-'z', 'LWIN', 'RWIN', 'MENU', '', '', 'NUMPAD0', 'NUMPAD1', 'NUMPAD2', 'NUMPAD3', _
+'', '', '', '', '', 'A', 'B', 'C', 'D', 'E', _
+'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', _
+'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', _
+'Z', 'LWIN', 'RWIN', 'MENU', '', '', 'NUMPAD0', 'NUMPAD1', 'NUMPAD2', 'NUMPAD3', _
 'NUMPAD4', 'NUMPAD5', 'NUMPAD6', 'NUMPAD7', 'NUMPAD8', 'NUMPAD9', 'NUMPADMULT', 'NUMPADADD', '', 'NUMPADSUB', _
 'NUMPADDOT', 'NUMPADDIV', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', _
 'F9', 'F10', 'F11', 'F12', '', '', '', '', '', '', _
