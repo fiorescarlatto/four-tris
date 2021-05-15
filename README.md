@@ -1,7 +1,7 @@
 # four-tris
 four-tris is a training tool for block-stacking games, built to allow you to quickly explore different situations and review your games.
 
-    Copyright (C) 2020  Fio#3682
+    Copyright (C) 2020  Fio
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
