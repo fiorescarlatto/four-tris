@@ -1,12 +1,29 @@
+#cs
+Copyright (C) 2020  github.com/fiorescarlatto
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
+#ce
+
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=icon.ico
 #AutoIt3Wrapper_Outfile=build\current\four-tris-x86.exe
 #AutoIt3Wrapper_Outfile_x64=build\current\four-tris-x64.exe
 #AutoIt3Wrapper_Compile_Both=y
 #AutoIt3Wrapper_UseX64=y
-#AutoIt3Wrapper_Res_Description=Fio's block-stacking tool
+#AutoIt3Wrapper_Res_Description=Open source training tool for block-stacking games.
 #AutoIt3Wrapper_Res_Fileversion=1.5.0.0
-#AutoIt3Wrapper_Res_LegalCopyright=Made by Fio, 2020 pls TTC dont sue me
+#AutoIt3Wrapper_Res_LegalCopyright=Copyright (C) 2020  github.com/fiorescarlatto.
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #include <WinAPIGDI.au3>
