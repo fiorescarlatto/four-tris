@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_Compile_Both=y
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=Fio's block-stacking tool
-#AutoIt3Wrapper_Res_Fileversion=1.4.4.0
+#AutoIt3Wrapper_Res_Fileversion=1.5.0.0
 #AutoIt3Wrapper_Res_LegalCopyright=Made by Fio, 2020 pls TTC dont sue me
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -16,6 +16,7 @@
 #include <BorderConstants.au3>
 #include <FontConstants.au3>
 #include <ScreenCapture.au3>
+#include <Clipboard.au3>
 #include <Array.au3>
 #include <Color.au3>
 
@@ -27,7 +28,7 @@
 
 Opt('TrayIconHide', 1)
 FileChangeDir(@ScriptDir)
-SRandom(Number(@MSEC&@SEC))
+SRandom(Number(@MSEC&@SEC&@MIN))
 
 ;fixed DPI resizing 2222222222222
 DllCall('shcore.dll', 'uint', 'SetProcessDpiAwareness', 'uint', 2)
@@ -39,7 +40,7 @@ FileInstall('settings.ini', 'settings.ini', 0)
 
 #Region GAME SETTINGS
 Global $DEBUG = (Not @Compiled)
-Global $SCALE = 1
+Global $SCALE = Number(IniRead("settings.ini", "SETTINGS", "SCALE", 1))
 
 Global $GRID_H = 4
 Global $GRID_X = Number(IniRead('settings.ini', 'OTHER', 'CELL_AMOUNT_X', 10))
@@ -56,7 +57,7 @@ Global $GRID  [$GRID_X][$GRID_Y+$GRID_H] ;game grid
 Global $HLIGHT[$GRID_X][$GRID_Y+$GRID_H] ;highlights
 
 
-Global $WTITLE = 'four-tris'
+Global $WTITLE = $DEBUG ? 'four-tris test_build-' & @HOUR&':'&@MIN : 'four-tris'
 Global $WSize[2] = [2*95 + $GRID_X*$GRID_S, 15*2 + ($GRID_Y+2)*$GRID_S]
 ;ensure minimum window size 300x610
 If $WSize[0] < 300 Then $WSize[0] = 300
@@ -89,9 +90,10 @@ If $BagType <> 0 And $BagType <> 1 And $BagType <> 2 Then $BagType = 0
 
 ;gameplay control
 Global $ARR     = Number(IniRead('settings.ini', 'SETTINGS', 'ARR', 17))
-Global $SDR     = Number(IniRead('settings.ini', 'SETTINGS', 'SDR', 67))
 Global $DAS  	= Number(IniRead('settings.ini', 'SETTINGS', 'DAS', 133))
 Global $DAS_DIR = ''
+Global $SDD     = Number(IniRead('settings.ini', 'SETTINGS', 'SDD', 67))
+Global $SDS     = Number(IniRead('settings.ini', 'SETTINGS', 'SDS',  1))
 
 ;garbage
 Global $GarbageString = String(IniRead('settings.ini', 'SETTINGS', 'GARBAGE', '1'))
@@ -105,6 +107,7 @@ Global $Stickyness = 0
 
 Global $Damage	= 0 ;damage sent
 Global $Lines	= 0 ;lines cleared
+Global $Moves   = 0 ;pieces used
 Global $Lost	= False ;game has ended
 Global $BtB		= False
 Global $Perfect = False
@@ -122,13 +125,16 @@ Global $EditEnabled   = True
 Global $HighlightMode = False
 Global $HighlightOn   = False
 
-Global $ShuffleBag     = IniRead('settings.ini', 'OTHER', 'SHUFFLE_BAG', True) = 'True' ? True : False
-Global $HighlightClear = IniRead('settings.ini', 'OTHER', 'HIGHLIGHT_CLEAR', True) = 'True' ? True : False
-Global $AutoColor      = IniRead('settings.ini', 'SETTINGS', 'AUTO_COLOR', True) = 'True' ? True : False
-Global $GhostPiece     = IniRead('settings.ini', 'SETTINGS', 'GHOST_PIECE', True) = 'True' ? True : False
-Global $InfiniteSwaps  = IniRead('settings.ini', 'SETTINGS', 'INFINITE_HOLD', False) = 'True' ? True : False
-Global $RenderTextures = IniRead('settings.ini', 'SETTINGS', 'RENDER_TEXTURES', False) = 'True' ? True : False
-Global $DasCancel      = IniRead('settings.ini', 'SETTINGS', 'DAS_CANCELLATION', True) = 'True' ? True : False
+Global $StaticBag		= IniRead('settings.ini', 'OTHER', 'STATIC_BAG', False)			= 'True' ? True : False
+Global $ShuffleBag		= IniRead('settings.ini', 'OTHER', 'SHUFFLE_BAG', False)		= 'True' ? True : False
+Global $RandomHold		= IniRead('settings.ini', 'OTHER', 'RANDOM_HOLD', False)		= 'True' ? True : False
+Global $HighlightClear	= IniRead('settings.ini', 'OTHER', 'HIGHLIGHT_CLEAR', True)		= 'True' ? True : False
+Global $AutoColor		= IniRead('settings.ini', 'SETTINGS', 'AUTO_COLOR', True)		= 'True' ? True : False
+Global $GhostPiece		= IniRead('settings.ini', 'SETTINGS', 'GHOST_PIECE', True)		= 'True' ? True : False
+Global $InfiniteSwaps	= IniRead('settings.ini', 'SETTINGS', 'INFINITE_HOLD', False)	= 'True' ? True : False
+Global $RenderTextures	= IniRead('settings.ini', 'SETTINGS', 'RENDER_TEXTURES', False)	= 'True' ? True : False
+Global $DasCancel		= IniRead('settings.ini', 'SETTINGS', 'DAS_CANCELLATION', True)	= 'True' ? True : False
+Global $MirrorQueue		= IniRead('settings.ini', 'SETTINGS', 'MIRROR_QUEUE', True)		= 'True' ? True : False
 
 ;drag file holder
 Global $DROPFILE[2] = [False,'']
@@ -148,28 +154,43 @@ Global $tARR = 0
 
 #EndRegion GAME SETTINGS
 #Region GDI OBJECTS
-Global $GUI = GUICreate($WTITLE, $WSize[0], $WSize[1])
+Global $SSize[2] = [$WSize[0]*$SCALE,  $WSize[1]*$SCALE ]
+
+;creates game window
+Global $WSTYLE = BitOR($WS_MINIMIZEBOX, $WS_CAPTION, $WS_POPUP, $WS_SYSMENU, $WS_SIZEBOX)
+Global $GUI = GUICreate($WTITLE, $SSize[0], $SSize[1], -1, -1, $WSTYLE)
 _WinAPI_DragAcceptFiles($GUI, True)
 
+;obtains offset position (size of bar and edges)
+Local  $Pos = WinGetPos($GUI)
+Global $WOffs[2] = [$Pos[2]-$SSize[0], $Pos[3]-$SSize[1]]
+
+;drawing tags
 Global $CHG = True
 Global $ANIMATION_PLAYING = False
 
 ;load custom texture
 Global $TEXTURE_S
 Global $TEXTURE_M[10] = [9, 4, 5, 3, 2, 0, 1, 6, 7, 8]
-Global $TEXTURE = _LoadPNG('texture.png')
+Global $TEXTURE_N = IniRead('settings.ini', 'SETTINGS', 'TEXTURE', 'template.png')
+Global $TEXTURE = _LoadPNG('textures/' & $TEXTURE_N)
 ;set the size of a single block to the vertical size
 $TEXTURE_S = _WinAPI_GetBitmapDimension($TEXTURE)
 $TEXTURE_S = DllStructGetData($TEXTURE_S, 'Y')
 
-;load game components
+;load game components and applies scaling
 Global $GDI = _WinAPI_GetDC($GUI)
-Global $BUF = _WinAPI_CreateCompatibleBitmap($GDI, $WSize[0], $WSize[1])
+Global $BUF = _WinAPI_CreateCompatibleBitmap($GDI, $SSize[0], $SSize[1])
 Global $DRW = _WinAPI_CreateCompatibleDC($GDI)
 Global $BDC = _WinAPI_CreateCompatibleDC($GDI)
 Global $ICONBMP = _WinAPI_LoadImage(0, 'buttons.bmp', $IMAGE_BITMAP, 0, 0, BitOR($LR_LOADFROMFILE, $LR_DEFAULTCOLOR))
+Global $TRANSFORM = _WinAPI_CreateTransform($SCALE, 0, 0, $SCALE, 0, 0)
 
-_WinAPI_SelectObject($DRW, $BUF)
+_WinAPI_SelectObject   ($DRW, $BUF)
+_WinAPI_SetGraphicsMode($DRW, $GM_ADVANCED)
+_WinAPI_SetGraphicsMode($GDI, $GM_ADVANCED)
+_WinAPI_SetWorldTransform($DRW, $TRANSFORM)
+_WinAPI_SetWorldTransform($GDI, $TRANSFORM)
 
 Global $Pen
 Global $Color[14]
@@ -304,9 +325,10 @@ Global Enum $MODEBUTTON, $SETTBUTTON, $TESTBUTTON, _
 			$UNDOBUTTON, $REDOBUTTON, _
 			$SNAPBUTTON, _
 			$HILIBUTTON, $HCLRBUTTON, _
-			$ACOLCHECK
+			$ACOLCHECK, _
+			$MIRRBUTTON
 
-Global $BUTTONS[14][3]
+Global $BUTTONS[15][3]
 Global $BUTTONTEXT[3] = ['TRAINING  MODE  ', '        SETTINGS', '          TEST  ']
 If Not $DEBUG Then ReDim $BUTTONTEXT[2]
 
@@ -315,19 +337,21 @@ $BUTTONS[$MODEBUTTON][2] = BoundBox($AlignL, $AlignB -  80, 75, 35)
 $BUTTONS[$SETTBUTTON][2] = BoundBox($AlignL, $AlignB -  40, 75, 35)
 
 ;special buttons
-$BUTTONS[$HOLDBUTTON][2] = BoundBox($AlignL,      $AlignT +  90,  75,  80)
-$BUTTONS[$HOLDDELETE][2] = BoundBox($AlignL + 50, $AlignT +  95,  20,  20)
-$BUTTONS[$HOLDCHECK ][2] = BoundBox($AlignL,      $AlignT + 172,  75,  18)
+$BUTTONS[$HOLDBUTTON][2] = BoundBox($AlignL,      $AlignT + 150,  75,  80)
+$BUTTONS[$HOLDDELETE][2] = BoundBox($AlignL + 50, $AlignT + 155,  20,  20)
+$BUTTONS[$HOLDCHECK ][2] = BoundBox($AlignL,      $AlignT + 232,  75,  18)
 $BUTTONS[$NEXTBUTTON][2] = BoundBox($AlignR,      $AlignT,        75, 240)
 $BUTTONS[$SHUFBUTTON][2] = BoundBox($AlignR + 50, $AlignT +   5,  20,  20)
 $BUTTONS[$UNDOBUTTON][2] = BoundBox($AlignR,      $AlignT + 250,  35,  35)
 $BUTTONS[$REDOBUTTON][2] = BoundBox($AlignR + 40, $AlignT + 250,  35,  35)
-$BUTTONS[$SNAPBUTTON][2] = BoundBox($AlignR,      $AlignB -  55,  75,  50)
+$BUTTONS[$SNAPBUTTON][2] = BoundBox($AlignR,      $AlignB -  45,  75,  40)
+$BUTTONS[$MIRRBUTTON][2] = BoundBox($AlignR,      $AlignB -  90,  75,  40)
 
 $BUTTONS[$HILIBUTTON][2] = BoundBox($AlignR, $AlignT + 295, 75, 35)
 $BUTTONS[$HCLRBUTTON][2] = BoundBox($AlignR, $AlignT + 335, 75, 35)
 
 $BUTTONS[$ACOLCHECK ][2] = BoundBox($AlignR, $AlignT + 397, 75, 18)
+
 
 ;paint buttons
 Global $PAINT[9][3]
@@ -344,11 +368,11 @@ $PAINT[8][2] = BoundBox($AlignR + 50, $AlignT + 370, 15, 15)
 
 #EndRegion BUTTONS
 #Region SETTINGS TAB
-Global $SEPARATORS[4][2] = [['COLORS', 5], ['KEYBINDS', 110], ['GAMEPLAY', 360], ['SOUND', 540]]
-Global $SETTINGS[19][7]
+Global $SEPARATORS[4][2] = [['COLORS', 5], ['KEYBINDS', 150], ['GAMEPLAY', 400], ['SOUND', 600]]
+Global $SETTINGS[23][7]
 Local  $Y
 
-;bounds
+;keybinds
 $Y = $SEPARATORS[1][1]+37+5
 $SETTINGS[0 ][2] = BoundBox($AlignC-92, $Y,     90,35)
 $SETTINGS[1 ][2] = BoundBox($AlignC+2,  $Y,     90,35)
@@ -362,20 +386,27 @@ $SETTINGS[7 ][2] = BoundBox($AlignC+2,  $Y+120, 90,35)
 $SETTINGS[8 ][2] = BoundBox($AlignC-92, $Y+165, 90,35)
 $SETTINGS[9 ][2] = BoundBox($AlignC+2,  $Y+165, 90,35)
 
+;colors
 $Y = $SEPARATORS[0][1]+37+5
 $SETTINGS[10][2] = BoundBox($AlignC-85, $Y, 35,35)
 $SETTINGS[11][2] = BoundBox($AlignC-45, $Y, 90,35)
 $SETTINGS[12][2] = BoundBox($AlignC+50, $Y, 35,35)
-$SETTINGS[13][2] = BoundBox($AlignC-75, $Y+40, 140,19)
+$SETTINGS[20][2] = BoundBox($AlignC-140, $Y+40, 35, 35)
+$SETTINGS[21][2] = BoundBox($AlignC-100, $Y+40, 200,35)
+$SETTINGS[22][2] = BoundBox($AlignC+105, $Y+40, 35, 35)
+$SETTINGS[13][2] = BoundBox($AlignC-75, $Y+80, 140,19)
 
+;gameplay
 $Y = $SEPARATORS[2][1]+37+5
 $SETTINGS[14][2] = BoundBox($AlignC-100, $Y,    200,35)
 $SETTINGS[15][2] = BoundBox($AlignC-100, $Y+45, 200,35)
 $SETTINGS[16][2] = BoundBox($AlignC-70,  $Y+90, 130,19)
 $SETTINGS[17][2] = BoundBox($AlignC-70,  $Y+112,130,19)
+$SETTINGS[18][2] = BoundBox($AlignC-70,  $Y+134,130,19)
 
+;sound
 $Y = $SEPARATORS[3][1]+37+5
-$SETTINGS[18][2] = BoundBox($AlignC-100, $Y, 200,35)
+$SETTINGS[19][2] = BoundBox($AlignC-100, $Y, 200,35)
 
 ;text
 $SETTINGS[0 ][3] = 'MOVE LEFT'
@@ -393,14 +424,18 @@ $SETTINGS[9 ][3] = 'HLIGHT MODE'
 $SETTINGS[10][3] = '<'
 $SETTINGS[11][3] = 'SKIN'
 $SETTINGS[12][3] = '>'
+$SETTINGS[20][3] = '<'
+$SETTINGS[21][3] = 'TEXTURE'
+$SETTINGS[22][3] = '>'
 $SETTINGS[13][3] = 'USE CUSTOM TEXTURES'
 
 $SETTINGS[14][3] = 'ARR'
 $SETTINGS[15][3] = 'DAS'
 $SETTINGS[16][3] = 'DAS CANCELLATION'
 $SETTINGS[17][3] = 'SHOW GHOST PIECE'
+$SETTINGS[18][3] = 'MIRROR QUEUE'
 
-$SETTINGS[18][3] = 'VOLUME'
+$SETTINGS[19][3] = 'VOLUME'
 
 
 ;current setting
@@ -418,14 +453,18 @@ $SETTINGS[9 ][4] = vKey($KEYBINDS[13][0])
 $SETTINGS[10][4] = ''
 $SETTINGS[11][4] = $CSKIN
 $SETTINGS[12][4] = ''
+$SETTINGS[20][4] = ''
+$SETTINGS[21][4] = $TEXTURE_N
+$SETTINGS[22][4] = ''
 $SETTINGS[13][4] = $RenderTextures
 
 $SETTINGS[14][4] = $ARR
 $SETTINGS[15][4] = $DAS
 $SETTINGS[16][4] = $DasCancel
 $SETTINGS[17][4] = $GhostPiece
+$SETTINGS[18][4] = $MirrorQueue
 
-$SETTINGS[18][4] = $VOLUME
+$SETTINGS[19][4] = $VOLUME
 
 ;action
 $SETTINGS[0 ][5] = 'SetKeybind(0,0)'
@@ -442,14 +481,18 @@ $SETTINGS[9 ][5] = 'SetKeybind(13,9)'
 $SETTINGS[10][5] = 'SetSkin(-1, 11)'
 $SETTINGS[11][5] = ''
 $SETTINGS[12][5] = 'SetSkin(+1, 11)'
+$SETTINGS[20][5] = 'SetTexture(-1, 21)'
+$SETTINGS[21][5] = ''
+$SETTINGS[22][5] = 'SetTexture(+1, 21)'
 $SETTINGS[13][5] = 'ToggleCheckbox(13, "RENDER_TEXTURES", $RenderTextures)'
 
 $SETTINGS[14][5] = 'SetSlider(14, 0,  32, "ARR", $ARR)'
 $SETTINGS[15][5] = 'SetSlider(15, 0, 250, "DAS", $DAS)'
 $SETTINGS[16][5] = 'ToggleCheckbox(16, "DAS_CANCELLATION", $DasCancel)'
 $SETTINGS[17][5] = 'ToggleCheckbox(17, "GHOST_PIECE", $GhostPiece)'
+$SETTINGS[18][5] = 'ToggleCheckbox(18, "MIRROR_QUEUE", $MirrorQueue)'
 
-$SETTINGS[18][5] = 'SetVolume(18)'
+$SETTINGS[19][5] = 'SetVolume(19)'
 
 ;trigger, 0 = falling edge, 1 = raising edge
 $SETTINGS[0 ][6] = 1
@@ -466,118 +509,155 @@ $SETTINGS[9 ][6] = 1
 $SETTINGS[10][6] = 1
 $SETTINGS[11][6] = 1
 $SETTINGS[12][6] = 1
+$SETTINGS[20][6] = 1
+$SETTINGS[21][6] = 1
+$SETTINGS[22][6] = 1
 $SETTINGS[13][6] = 0
 
 $SETTINGS[14][6] = 0
 $SETTINGS[15][6] = 0
 $SETTINGS[16][6] = 0
 $SETTINGS[17][6] = 0
-
 $SETTINGS[18][6] = 0
+
+$SETTINGS[19][6] = 0
 
 #EndRegion
 #Region TESTING
 Func TestFunction()
+
+EndFunc
+
+
+Func TestFunction1()
 	If Not $DEBUG Then Return
 
-	Local $Pattern[4][5] = [ _
-	[1,1,1,1,1], _
-	[1,0,0,0,0], _
-	[0,0,1,0,0], _
-	[0,0,1,1,1]]
+	Local $Filter[4][6] = [ _
+	[2,2,2,2,2,3], _
+	[2,0,0,0,0,2], _
+	[0,0,2,0,0,3], _
+	[0,0,2,2,2,3]]
 
-	SearchPattern($Pattern, 2)
-EndFunc
+;~ 	Local $Filter[5][3] = [ _
+;~ 	[2,2,2], _
+;~ 	[2,0,2], _
+;~ 	[0,0,0], _
+;~ 	[0,0,2], _
+;~ 	[3,2,2]]
 
-Func SearchPattern(ByRef $Pattern, $Depth)
-	Local $BoardState = SaveState()
+	Local $Mirror = FilterMirror($Filter)
 
-	Local $Search[1] = [__MemCopy($GRID)]
-	Local $SearchSpace[64]
-	Local $SearchCount = 0
+	Local $PL = FilterGrid($GRID, $Filter)
+	Local $PR = FilterGrid($GRID, $Mirror)
 
-	Local $Solutions[64]
-	Local $SolutionsCount = 0
+	Local $Max = 0
+	Local $Pos[3]
 
-	For $d = 1 To $Depth
-		For $s = 0 To UBound($Search) - 1
-			$GRID = $Search[$s]
+	For $i = 0 To UBound($PL, 1) - 1
+		For $j = UBound($PL, 2) - 1 To 0 Step -1
 
-			;hold?
+			If $PL[$i][$j] > $Max Then
+				$Max = $PL[$i][$j]
+				$Pos[0] = $i
+				$Pos[1] = $j
+				$Pos[2] = 0
+			EndIf
 
-			For $a = 0 To 3
-			For $x = -4 To UBound($GRID, 1)
-				If Not PieceFits(BagGetPiece(), $a, $x, 0) Then ContinueLoop
+			If $PR[$i][$j] > $Max Then
+				$Max = $PR[$i][$j]
+				$Pos[0] = $i
+				$Pos[1] = $j
+				$Pos[2] = 1
+			EndIf
 
-				LoadState($Search[$s])
+		Next
+	Next
 
-				$y = 0
-				Do
-					$y += 1
-				Until Not PieceFits(BagGetPiece(), $a, $x, $y)
-				PieceFreeze($GRID, BagGetPiece(), $a, $x, $y - 1)
-				PieceNext()
+	If $Max > 1 Then
+		HighlightClear(4)
+		For $i = 0 To UBound($Filter, 1) - 1
+			For $j = 0 To UBound($Filter, 2) - 1
 
-				If $SearchCount = UBound($SearchSpace) Then ReDim $SearchSpace[UBound($SearchSpace) + 64]
-				$SearchSpace[$SearchCount] = SaveState()
-				$SearchCount += 1
-
-				If CheckPattern($GRID, $Pattern) Then
-					If $SolutionsCount = UBound($Solutions) Then ReDim $Solutions[UBound($Solutions) + 64]
-					$Solutions[$SolutionsCount] = SaveState()
-					$SolutionsCount += 1
+				If $Pos[2] = 0 Then
+					If BlockInBounds($HLIGHT, $Pos[0] + $i, $Pos[1] + $j) And $Filter[$i][$j] = 2 Then
+						$HLIGHT[$Pos[0] + $i][$Pos[1] + $j] = 4
+					EndIf
+				Else
+					If BlockInBounds($HLIGHT, $Pos[0] + $i, $Pos[1] + $j) And $Mirror[$i][$j] = 2 Then
+						$HLIGHT[$Pos[0] + $i][$Pos[1] + $j] = 4
+					EndIf
 				EndIf
 			Next
-			Next
 		Next
-
-		ReDim $SearchSpace[$SearchCount]
-		$Search = __MemCopy($SearchSpace)
-		$SearchCount = 0
-	Next
-
-	ReDim $Solutions[$SolutionsCount]
-	For $i = 0 To UBound($Solutions) - 1
-		LoadState($Solutions[$i])
-		DrawGame($DRW)
-
-		Sleep(100)
-	Next
-
-	LoadState($BoardState)
+	EndIf
 EndFunc
 
-Func PatternMatches(ByRef $GRID, ByRef $Pattern, $x, $y)
-	For $i = 0 To UBound($Pattern, 1) - 1
-	For $j = 0 To UBound($Pattern, 2) - 1
-		If Not (($Pattern[$i][$j] = 1 And BlockIsFull($GRID, $x+$i, $y+$j)) Or _
-		        ($Pattern[$i][$j] = 0 And Not BlockIsFull($GRID, $x+$i, $y+$j)) Or _
-		        ($Pattern[$i][$j] = 2)) Then
-			Return False
-		EndIf
+Func FilterAt(ByRef $Filter, $x, $y)
+	If $x < 0 Or $y < 0 Or $x >= UBound($Filter, 1) Or $y >= UBound($Filter, 2) Then Return 3
+	Return $Filter[$x][$y]
+EndFunc
+Func FilterMatches(ByRef $GRID, ByRef $Filter, $x, $y)
+	Local $Matching = 0
+	Local $Free = 0
+
+	For $i = 0 To UBound($Filter, 1) - 1
+		For $j = 0 To UBound($Filter, 2) - 1
+			If $Filter[$i][$j] = 0 And     BlockIsFull($GRID, $x+$i, $y+$j) Then Return 0 ;must be empty
+			If $Filter[$i][$j] = 1 And Not BlockIsFull($GRID, $x+$i, $y+$j) Then Return 0 ;must be full
+
+			If $Filter[$i][$j] = 2 Then ;must be fillable
+				If BlockIsFull($GRID, $x+$i, $y+$j) Then
+					$Matching += 1
+				Else
+					$Free = False
+
+					If FilterAt($Filter, $i-1, $j) And Not BlockIsFull($GRID, $x+$i-1, $y+$j) Then $Free = True
+					If FilterAt($Filter, $i+1, $j) And Not BlockIsFull($GRID, $x+$i+1, $y+$j) Then $Free = True
+					If FilterAt($Filter, $i, $j-1) And Not BlockIsFull($GRID, $x+$i, $y+$j-1) Then $Free = True
+					If FilterAt($Filter, $i, $j+1) And Not BlockIsFull($GRID, $x+$i, $y+$j+1) Then $Free = True
+
+					If Not $Free Then Return 0
+				EndIf
+			EndIf
+
+			If $Filter[$i][$j] = 3 Then ContinueLoop;$Matching += 1 ;can be any
+		Next
 	Next
+
+	Return $Matching
+EndFunc
+Func FilterGrid(ByRef $GRID, ByRef $Filter)
+	Local $P[UBound($GRID, 1)][UBound($GRID, 2)]
+
+	For $x = 0 To UBound($GRID, 1) - UBound($Filter, 1)
+		For $y = 0 To UBound($GRID, 2) - UBound($Filter, 2)
+			$P[$x][$y] = FilterMatches($GRID, $Filter, $x, $y)
+		Next
 	Next
-	Return True
+
+	Return $P
+EndFunc
+Func FilterMirror(ByRef $Filter)
+	Local $Mirror[UBound($Filter, 1)][UBound($Filter, 2)]
+
+	For $i = 0 to UBound($Filter, 1) - 1
+		For $j = 0 To UBound($Filter, 2) - 1
+			$Mirror[UBound($Filter, 1) - $i - 1][$j] = $Filter[$i][$j]
+		Next
+	Next
+
+	Return $Mirror
 EndFunc
 
-Func CheckPattern(ByRef $GRID, ByRef $Pattern)
-	For $x = 0 To UBound($GRID, 1) - UBound($Pattern, 1)
-	For $y = 0 To UBound($GRID, 2) - UBound($Pattern, 2)
-		If PatternMatches($GRID, $Pattern, $x, $y) Then
-			Return True
-		EndIf
-	Next
-	Next
-	Return False
-EndFunc
 
 #EndRegion
 
 GUIRegisterMsg($WM_PAINT, 'WMPaint')
 GUIRegisterMsg($WM_MOVE,  'WMPaint')
-GUIRegisterMsg($WM_DROPFILES, 'WMDropFiles')
+GUIRegisterMsg($WM_EXITSIZEMOVE,'WMResize')
+GUIRegisterMsg($WM_DROPFILES, 	'WMDropFiles')
 GUIRegisterMsg($WM_MBUTTONDOWN, 'WMMButtonDown')
-GUIRegisterMsg($WM_MOUSEWHEEL, 'WMMouseWheel')
+GUIRegisterMsg($WM_MOUSEWHEEL,	'WMMouseWheel')
 
 clear_board()
 GUISetState()
@@ -613,7 +693,7 @@ Func Main()
 		If $msg = -3 Then Exit
 		If $msg = -5 Then $CHG = True ;minimize/maximize
 
-		$m = GUIGetCursorInfo($GUI)
+		$m = GUIGetMousePosition($GUI)
 		If Not IsArray($m) Then ContinueLoop
 
 		For $i = 0 To UBound($BUTTONS) - 1
@@ -643,6 +723,7 @@ Func Main()
 			If $BUTTONS[$HOLDDELETE][0] Then Return HoldReset()
 			If $BUTTONS[$HOLDBUTTON][0] Then Return HoldSet()
 			If $BUTTONS[$SNAPBUTTON][0] Then Return SnapBoard()
+			If $BUTTONS[$MIRRBUTTON][0] Then Return GridMirror()
 			If $BUTTONS[$UNDOBUTTON][0] Then Return Undo()
 			If $BUTTONS[$REDOBUTTON][0] Then Return Redo()
 
@@ -655,7 +736,10 @@ Func Main()
 				For $i = 0 To 7
 					If $PAINT[$i][0] Then Return EditColorSet($i+1)
 				Next
-				If $PAINT[8][0] Then FillColor($GRID, 8)
+				If $PAINT[8][0] Then
+					NewUndo()
+					FillColor($GRID, 8)
+				EndIf
 			EndIf
 		EndIf
 
@@ -669,6 +753,19 @@ Func Main()
 
 	Until $msg = 0
 EndFunc   ;==>Main
+Func GUIGetMousePosition($GUI)
+	Local $Return = [-1,-1,0,0,0]
+	Local $Pos = GUIGetCursorInfo($GUI)
+
+	If IsArray($Pos) Then
+		$Pos[0] = $Pos[0]/$SCALE
+		$Pos[1] = $Pos[1]/$SCALE
+		Return $Pos
+	Else
+		Return $Return
+	EndIf
+EndFunc
+
 
 Func SetHotkeys($Flag = 0)
 	$KEYACTIVE = WinActive($GUI)
@@ -685,30 +782,37 @@ Func SetHotkeys($Flag = 0)
 EndFunc   ;==>SetHotkeys
 
 Func KeyProc($nCode, $wParam, $lParam)
-	If $nCode >= 0 And $KEYACTIVE And Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000) Then
+	;doesnt allow CTRL
+	;If $nCode >= 0 And $KEYACTIVE And Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000) Then
+
+	If $nCode >= 0 And $KEYACTIVE Then
 		Local $tKEYHOOKS = DllStructCreate($tagKBDLLHOOKSTRUCT, $lParam)
 		Local $vkCode    = DllStructGetData($tKEYHOOKS, 'vkCode')
 		Local $msgTime   = DllStructGetData($tKEYHOOKS, 'time')
 
-		If $wParam = $WM_KEYDOWN Then
-			$LASTKEYPRESSED = $vkCode
+		;Only allows CTRL as a single Key
+		If $vkCode = 162 Or $vkCode = 163 Or Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000) Then
 
-			For $i = 0 To UBound($KEYBINDS) - 1
-				If Not $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
-					$KEYBINDS[$i][$KEYSTATE] = True
-					$KEYBINDS[$i][$KEYTIME ] = $msgTime
-					If Not $KEYBINDS[$i][$KEYEDGE] Then Call($KEYBINDS[$i][$KEYACTION])
-				EndIf
-			Next
+			If $wParam = $WM_KEYDOWN Then
+				$LASTKEYPRESSED = $vkCode
 
-		ElseIf $wParam = $WM_KEYUP Then
-			For $i = 0 To UBound($KEYBINDS) - 1
-				If $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
-					$KEYBINDS[$i][$KEYSTATE] = False
-					$KEYBINDS[$i][$KEYTIME ] = $msgTime
-					If $KEYBINDS[$i][$KEYEDGE] Then Call($KEYBINDS[$i][$KEYACTION])
-				EndIf
-			Next
+				For $i = 0 To UBound($KEYBINDS) - 1
+					If Not $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
+						$KEYBINDS[$i][$KEYSTATE] = True
+						$KEYBINDS[$i][$KEYTIME ] = $msgTime
+						If Not $KEYBINDS[$i][$KEYEDGE] Then Call($KEYBINDS[$i][$KEYACTION])
+					EndIf
+				Next
+
+			ElseIf $wParam = $WM_KEYUP Then
+				For $i = 0 To UBound($KEYBINDS) - 1
+					If $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
+						$KEYBINDS[$i][$KEYSTATE] = False
+						$KEYBINDS[$i][$KEYTIME ] = $msgTime
+						If $KEYBINDS[$i][$KEYEDGE] Then Call($KEYBINDS[$i][$KEYACTION])
+					EndIf
+				Next
+			EndIf
 		EndIf
 	EndIf
 
@@ -722,6 +826,29 @@ EndFunc
 Func WMPaint($hWnd, $iMsg, $wParam, $lParam)
 	$CHG = True
 EndFunc
+Func WMResize($hWnd, $iMsg, $wParam, $lParam)
+	$CHG = True
+	Local $Pos = WinGetClientSize($GUI)
+
+	;Calculates new $SCALE
+	$SCALE = $Pos[1]/$WSize[1]
+	$SSize[0] = Int($WSize[0]*$SCALE)
+	$SSize[1] = Int($WSize[1]*$SCALE)
+
+	;Sets new position
+	_WinAPI_SetWindowPos($GUI, 0,0,0, $SSize[0]+$WOffs[0], $SSize[1]+$WOffs[1], BitOR($SWP_NOZORDER, $SWP_NOMOVE))
+	;Resizes the Buffer and the Transform
+	_WinAPI_DeleteObject($BUF)
+	$BUF       = _WinAPI_CreateCompatibleBitmap($GDI, $SSize[0], $SSize[1])
+	$TRANSFORM = _WinAPI_CreateTransform($SCALE, 0, 0, $SCALE, 0, 0)
+
+	;Applies changes
+	_WinAPI_SelectObject($DRW, $BUF)
+	_WinAPI_SetWorldTransform($DRW, $TRANSFORM)
+	_WinAPI_SetWorldTransform($GDI, $TRANSFORM)
+
+	IniWrite("settings.ini", "SETTINGS", "SCALE", Round($SCALE,3))
+EndFunc
 Func WMDropFiles($hWnd, $iMsg, $wParam, $lParam)
 	Local $Drop
 
@@ -732,7 +859,7 @@ Func WMDropFiles($hWnd, $iMsg, $wParam, $lParam)
 	$DROPFILE[1] = $Drop[1]
 EndFunc
 Func WMMButtonDown($hWnd, $iMsg, $wParam, $lParam)
-	Local $m = GUIGetCursorInfo($GUI)
+	Local $m = GUIGetMousePosition($GUI)
 	If Not IsArray($m) Then Return
 
 	If $EditEnabled And Bounds($m, $GBounds) Then
@@ -744,12 +871,21 @@ Func WMMButtonDown($hWnd, $iMsg, $wParam, $lParam)
 EndFunc
 Func WMMouseWheel($hWnd, $iMsg, $wParam, $lParam)
 	Local $CTRL = BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000)
+	Local $ALT  = BitAND(_WinAPI_GetAsyncKeyState(0x12), 0x8000)
 
 	If $CTRL Then
 		If BitShift($wParam, 16) < 0 Then
 			GridShift(-1) ;wheel down
 		Else
 			GridShift(+1) ;wheel up
+		EndIf
+	EndIf
+
+	If $ALT Then
+		If BitShift($wParam, 16) < 0 Then
+			GridRoll(-1) ;wheel down
+		Else
+			GridRoll(+1) ;wheel up
 		EndIf
 	EndIf
 EndFunc
@@ -762,12 +898,12 @@ Func EditHighlight(ByRef $GRID, $c = 0)
 	Local $CTRL  = BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000) ;ctrl
 
 	$HighlightOn = True
-	$cm = GUIGetCursorInfo($GUI)
+	$cm = GUIGetMousePosition($GUI)
 	$mb = BitAND(_WinAPI_GetAsyncKeyState(0x04), 0x8000)
 	Do
 		GUIGetMsg() ;releases cpu cycles
 		$om = $cm
-		$cm = GUIGetCursorInfo($GUI)
+		$cm = GUIGetMousePosition($GUI)
 		$mb = BitAND(_WinAPI_GetAsyncKeyState(0x04), 0x8000)
 
 		For $k = 1 To 7 ;to avoid sparse dots
@@ -811,12 +947,12 @@ Func EditBoard(ByRef $GRID, $c = 0)
 	Local $Stroke = 0
 
 	NewUndo()
-	$cm = GUIGetCursorInfo($GUI)
+	$cm = GUIGetMousePosition($GUI)
 
 	Do
 		GUIGetMsg() ;releases cpu cycles
 		$om = $cm
-		$cm = GUIGetCursorInfo($GUI)
+		$cm = GUIGetMousePosition($GUI)
 
 		For $k = 1 To 7 ;to avoid sparse dots
 			$m[0] = $om[0] + ($cm[0]-$om[0]) * $k/7
@@ -935,7 +1071,6 @@ Func AutoColor(ByRef $GRID, $X, $Y, $Stroke = 0, $StrokeCoord = 0)
 	EndIf
 EndFunc
 Func FillColor(ByRef $GRID, $c = 0)
-	NewUndo()
 	For $i = 0 To UBound($GRID, 1) - 1
 		For $j = 0 To UBound($GRID, 2) - 1
 			$GRID[$i][$j] = $GRID[$i][$j] ? $c : 0
@@ -973,8 +1108,7 @@ EndFunc
 
 
 Func Settings()
-	Local $BUF = _WinAPI_CreateCompatibleBitmap($GDI, $WSize[0], $WSize[1])
-	Local $DRW = _WinAPI_CreateCompatibleDC($GDI)
+	Local $BUF = _WinAPI_CreateCompatibleBitmap($GDI, $SSize[0], $SSize[1])
 	_WinAPI_SelectObject($DRW, $BUF)
 
 	$CHG = True
@@ -991,7 +1125,7 @@ Func Settings()
 		If $msg = -3 Then ExitLoop
 		If $msg = -5 Then $CHG = True ;minimize
 
-		$m = GUIGetCursorInfo()
+		$m = GUIGetMousePosition($GUI)
 		If Not IsArray($m) Then ContinueLoop
 
 		For $i = 0 To UBound($SETTINGS) - 1
@@ -1018,7 +1152,6 @@ Func Settings()
 	DrawTransition($DRW, 150)
 	$CHG = True
 
-	_WinAPI_DeleteDC($GDI)
 	_WinAPI_DeleteObject($BUF)
 EndFunc
 Func SetColors($ColorSet)
@@ -1061,11 +1194,37 @@ Func SetSkin($D, $S)
 
 	$CSKIN           = $SKINS[$i]
 	$SETTINGS[$S][4] = $SKINS[$i]
-
 	IniWrite('settings.ini','SETTINGS','SKIN',$CSKIN)
 
 	SetColors($CSKIN)
 EndFunc
+Func SetTexture($D, $S)
+	Local $FileSearch
+	Local $FileName
+	Local $FirstFile = ''
+
+	$FileSearch = FileFindFirstFile('textures/*.png')
+	While 1
+		$FileName = FileFindNextFile($FileSearch)
+		If @error Then ExitLoop
+		If $FirstFile = '' Then $FirstFile = $FileName
+		If $FileName = $TEXTURE_N Then
+			$TEXTURE_N = FileFindNextFile($FileSearch)
+			If @error Then $TEXTURE_N = $FirstFile
+		EndIf
+	WEnd
+	FileClose($FileSearch)
+
+	$SETTINGS[$S][4] = $TEXTURE_N
+	IniWrite('settings.ini','SETTINGS','TEXTURE',$TEXTURE_N)
+
+	;load custom texture
+	_WinAPI_DeleteObject($TEXTURE)
+	$TEXTURE = _LoadPNG('textures/' & $TEXTURE_N)
+	$TEXTURE_S = _WinAPI_GetBitmapDimension($TEXTURE)
+	$TEXTURE_S = DllStructGetData($TEXTURE_S, 'Y')
+EndFunc
+
 Func SetKeybind($KB, $STT)
 	DrawKeyCapture($STT)
 
@@ -1088,7 +1247,7 @@ Func SetSlider($S, $Min, $Max, $Key, ByRef $Value)
 
 	Do
 		GUIGetMsg()
-		$m = GUIGetCursorInfo($GUI)
+		$m = GUIGetMousePosition($GUI)
 		$m[0] -= $b[0]
 
 		If $m[0] < 0 Then $m[0] = 0
@@ -1133,6 +1292,7 @@ Func DrawGame($DRW, $Render = True)
 	DrawScore($DRW)
 
 	DrawSnapButton($DRW)
+	DrawMirrorButton($DRW)
 	DrawUndoButton($DRW)
 	DrawButtons($DRW)
 
@@ -1247,7 +1407,7 @@ Func DrawHighlight($DRW)
 	Next
 
 	For $i = 0 To UBound($HLIGHT, 1) - 1
-		For $j = $GRID_H To UBound($HLIGHT, 2) - 1
+		For $j = $GRID_H-2 To UBound($HLIGHT, 2) - 1
 
 			If Not $HLIGHT[$i][$j] Then ContinueLoop
 
@@ -1328,7 +1488,7 @@ Func DrawNext($DRW)
 	If $BUTTONS[$SHUFBUTTON][0] Then _WinAPI_FrameRect($DRW, Rect($B[0], $B[1], $B[2], $B[3]), $Brush[$CREV])
 
 	_WinAPI_SelectObject($BDC, $ICONBMP)
-	_WinAPI_BitBlt($DRW, $B[0]+1, $B[1]+1, 18, 18, $BDC, 76, 0, $SRCINVERT)
+	_WinAPI_BitBlt($DRW, $B[0]+1, $B[1]+1, 18, 18, $BDC, 0, 40, $SRCINVERT)
 EndFunc   ;==>DrawNext
 Func DrawHold($DRW)
 	Local $Shape = PieceGetShape($PieceH, 0)
@@ -1360,7 +1520,7 @@ Func DrawHold($DRW)
 		$B = $BUTTONS[$HOLDDELETE][2]
 
 		_WinAPI_SelectObject($BDC, $ICONBMP)
-		_WinAPI_BitBlt($DRW, $B[0]+3, $B[1]+3, 14, 14, $BDC, 76, 19, $SRCINVERT)
+		_WinAPI_BitBlt($DRW, $B[0]+3, $B[1]+3, 14, 14, $BDC, 0, 59, $SRCINVERT)
 
 		If $BUTTONS[$HOLDDELETE][0] Then _WinAPI_FrameRect($DRW, Rect($B[0], $B[1], $B[2], $B[3]), $Brush[$CREV])
 	EndIf
@@ -1368,17 +1528,23 @@ EndFunc   ;==>DrawHold
 
 Func DrawScore($DRW)
 	Local $X
+	Local $M = ($Moves > 0) ? $Moves : 1
+	Local $APP = StringLeft(Round($Damage / $M, 4) & '000000', 6)
 
 	$X = $AlignL
 
-	_WinAPI_FillRect($DRW, Rect($X, 10, 75, 80), $Brush[$CBOX])
+	_WinAPI_FillRect($DRW, Rect($X, 10, 75, 140), $Brush[$CBOX])
 	_WinAPI_SetTextColor($DRW, $Color[$CTXT])
 
 	$X += 2
-	_WinAPI_DrawText($DRW, 'CLEAR', Rect($X + 10, 20, 55, 15), $DT_LEFT)
-	_WinAPI_DrawText($DRW, 'SENT',  Rect($X + 10, 50, 55, 15), $DT_LEFT)
-	_WinAPI_DrawText($DRW, StringRight('000000' & $Lines,  6), Rect($X + 10, 32, 55, 20), $DT_LEFT)
-	_WinAPI_DrawText($DRW, StringRight('000000' & $Damage, 6), Rect($X + 10, 62, 55, 20), $DT_LEFT)
+	_WinAPI_DrawText($DRW, 'CLEAR',  Rect($X + 10,  20, 55, 15), $DT_LEFT)
+	_WinAPI_DrawText($DRW, 'ATTACK', Rect($X + 10,  50, 55, 15), $DT_LEFT)
+	_WinAPI_DrawText($DRW, 'PIECES', Rect($X + 10,  80, 55, 15), $DT_LEFT)
+	_WinAPI_DrawText($DRW, 'APP',    Rect($X + 10, 110, 55, 15), $DT_LEFT)
+	_WinAPI_DrawText($DRW, StringRight('000000' & $Lines,  6), Rect($X + 10,  32, 55, 20), $DT_LEFT)
+	_WinAPI_DrawText($DRW, StringRight('000000' & $Damage, 6), Rect($X + 10,  62, 55, 20), $DT_LEFT)
+	_WinAPI_DrawText($DRW, StringRight('000000' & $Moves,  6), Rect($X + 10,  92, 55, 20), $DT_LEFT)
+	_WinAPI_DrawText($DRW, StringRight('000000' & $APP,    6), Rect($X + 10, 122, 55, 20), $DT_LEFT)
 EndFunc   ;==>DrawScore
 Func DrawButtons($DRW)
 	Local $B, $X
@@ -1411,7 +1577,16 @@ Func DrawSnapButton($DRW)
 	If $BUTTONS[$SNAPBUTTON][0] Then _WinAPI_FrameRect($DRW, Rect($B[0], $B[1], $B[2], $B[3]), $Brush[$CTXT])
 
 	_WinAPI_SelectObject($BDC, $ICONBMP)
-	_WinAPI_BitBlt($DRW, $B[0] + 8, $B[1] + 6, 58, 40, $BDC, 17, 0, $SRCINVERT)
+	_WinAPI_BitBlt($DRW, $B[0] + 8, $B[1] + 3, 58, 35, $BDC, 20, 0, $SRCINVERT)
+EndFunc
+Func DrawMirrorButton($DRW)
+	Local $B = $BUTTONS[$MIRRBUTTON][2]
+
+	_WinAPI_FillRect($DRW, Rect($B[0], $B[1], $B[2], $B[3]), $Brush[$CBOX])
+	If $BUTTONS[$MIRRBUTTON][0] Then _WinAPI_FrameRect($DRW, Rect($B[0], $B[1], $B[2], $B[3]), $Brush[$CTXT])
+
+	_WinAPI_SelectObject($BDC, $ICONBMP)
+	_WinAPI_BitBlt($DRW, $B[0] + 8, $B[1] + 3, 58, 35, $BDC, 20, 36, $SRCINVERT)
 EndFunc
 Func DrawUndoButton($DRW)
 	Local $X, $Y
@@ -1492,7 +1667,7 @@ Func DrawAttack($DRW)
 	If $AttackText = '' Then Return
 
 	Local $X = 10
-	Local $Y = 250
+	Local $Y = 310
 	Local $Text[2] = [StringStripWS(StringLeft($AttackText, 6),7), _
 					  StringStripWS(StringTrimLeft($AttackText, 6),7)]
 
@@ -1505,7 +1680,7 @@ Func DrawCombo($DRW)
 	If $ClearCombo < 2 Then Return
 
 	Local $X = 10
-	Local $Y = 200
+	Local $Y = 260
 
 	_WinAPI_SelectObject($DRW, $Font20)
 	_WinAPI_DrawText($DRW, 'x' & $ClearCombo - 1, Rect($X,$Y+10,75,30), $DT_CENTER)
@@ -1553,7 +1728,12 @@ Func DrawSettings($DRW, $Render = True)
 	DrawSlider($DRW, 15, $DAS/250)
 	DrawCheckbox($DRW, 16)
 	DrawCheckbox($DRW, 17)
-	DrawSlider($DRW, 18, $VOLUME/100)
+	DrawCheckbox($DRW, 18)
+	DrawSlider($DRW, 19, $VOLUME/100)
+
+	For $i = 20 To 22
+		DrawButton($DRW, $i)
+	Next
 
 	If $Render Then _WinAPI_BitBlt($GDI, 0, 0, $WSize[0], $WSize[1], $DRW, 0, 0, $SRCCOPY)
 EndFunc
@@ -1632,10 +1812,10 @@ Func DrawPieces($DRW)
 				If $Shape[$i][$j] Then
 					$X = 14
 					If $k = 0 Or $k = 3 Then $X = 8
-					_WinAPI_FillRect($DRW, Rect($X + $i * $Size, $Y + $j * $Size, $Size-$STYLE, $Size-$STYLE), $Brush[$k+1])
+					DrawMiniBlock($DRW, $X + $i*$Size, $Y + $j*$Size, $Size-$STYLE, $k+1)
 					$X = $WSize[0] - 55
 					If $k = 0 Or $k = 3 Then $X = $WSize[0] - 62
-					_WinAPI_FillRect($DRW, Rect($X + $i * $Size, $Y + $j * $Size, $Size-$STYLE, $Size-$STYLE), $Brush[$k+1])
+					DrawMiniBlock($DRW, $X + $i*$Size, $Y + $j*$Size, $Size-$STYLE, $k+1)
 				EndIf
 			Next
 		Next
@@ -1763,13 +1943,14 @@ Func SaveState()
 
 	$SaveState[0] = $Damage
 	$SaveState[1] = $Lines
-	$SaveState[2] = $PieceH
-	$SaveState[3] = $Swapped
-	$SaveState[4] = $BtB
-	$SaveState[5] = $ClearCombo
-	$SaveState[6] = $BagSeed
-	$SaveState[7] = __MemCopy($GRID)
-	$SaveState[8] = __MemCopy($Bag)
+	$SaveState[2] = $Moves
+	$SaveState[3] = $PieceH
+	$SaveState[4] = $Swapped
+	$SaveState[5] = $BtB
+	$SaveState[6] = $ClearCombo
+	$SaveState[7] = $BagSeed
+	$SaveState[8] = __MemCopy($GRID)
+	$SaveState[9] = __MemCopy($Bag)
 
 	Return $SaveState
 EndFunc
@@ -1779,13 +1960,14 @@ Func LoadState($SaveState)
 	StatsReset()
 	$Damage		= $SaveState[0]
 	$Lines		= $SaveState[1]
-	$PieceH		= $SaveState[2]
-	$Swapped	= $SaveState[3]
-	$BtB		= $SaveState[4]
-	$ClearCombo	= $SaveState[5]
-	$BagSeed    = $SaveState[6]
-	$GRID 		= __MemCopy($SaveState[7])
-	$Bag		= __MemCopy($SaveState[8])
+	$Moves		= $SaveState[2]
+	$PieceH		= $SaveState[3]
+	$Swapped	= $SaveState[4]
+	$BtB		= $SaveState[5]
+	$ClearCombo	= $SaveState[6]
+	$BagSeed    = $SaveState[7]
+	$GRID 		= __MemCopy($SaveState[8])
+	$Bag		= __MemCopy($SaveState[9])
 	PieceReset()
 
 	$CHG		= True
@@ -1819,9 +2001,9 @@ Func StateDecode($Data)
 
 	;decode and decompress the data
 	$QueueData = __QueueDecode($QueueData)
-	If Not IsArray($QueueData) Then Return
+	If Not IsArray($QueueData) Then Return False
 	$BoardData = __BoardDecode($BoardData)
-	If Not IsArray($BoardData) Then Return
+	If Not IsArray($BoardData) Then Return False
 
 	;we now divide the info into title and comment
 	$Comment = StringReplace($Comment, @CR, '')
@@ -1844,8 +2026,9 @@ Func StateDecode($Data)
 	$Bag     = $QueueData[2]
 	$GRID    = $BoardData
 	DrawComment(0, 2000, $Title, $Comment)
-
 	$CHG = True
+
+	Return True
 EndFunc
 
 Func __QueueEncode()
@@ -1959,8 +2142,24 @@ Func Copy()
 	ClipPut(StateEncode())
 EndFunc
 Func Paste()
-	StateDecode(ClipGet())
-	If $ShuffleBag Then BagShuffle()
+	If StateDecode(ClipGet()) Then
+		If $ShuffleBag Then
+			BagShuffle()
+			BagReseed()
+
+			If $RandomHold Then HoldRandomize()
+		EndIf
+
+	;StateDecode() Failed, Clipboard contains BMP?
+	ElseIf _ClipBoard_IsFormatAvailable($CF_BITMAP) Then
+
+		If _ClipBoard_Open($GUI) Then
+			$Snap = _ClipBoard_GetDataEx($CF_BITMAP)
+			If $Snap <> 0 Then FillBoardFromBitmap($Snap)
+
+			_ClipBoard_Close()
+		EndIf
+	EndIf
 EndFunc
 Func Undo()
 	If $UNDO_MAX = 0 Then Return
@@ -2234,8 +2433,12 @@ Func GameInput()
 		EndIf
 	EndIf
 
-	If $KEYBINDS[2][$KEYSTATE] And $KEYBINDS[2][$KEYTIME] + $SDR < _WinAPI_GetTickCount() Then
-		MovePiece(0, 0, +1)
+	Local $tSDS = 0
+	If $KEYBINDS[2][$KEYSTATE] Then
+		While $KEYBINDS[2][$KEYTIME] + $SDD + $tSDS < _WinAPI_GetTickCount()
+			If Not MovePiece(0,0,+1) Then ExitLoop
+			$tSDS += 128/$SDS
+		WEnd
 	EndIf
 EndFunc   ;==>GameInput
 Func RotateCCW()
@@ -2287,11 +2490,16 @@ EndFunc
 Func Drop()
 	If $Lost Then Return
 
+	$KEYBINDS[0][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
+	$KEYBINDS[1][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
+	$tARR = 0
+
 	Do
 	Until Not MovePiece(0, 0, +1)
 
 	NewUndo()
 	Sound('drop')
+	$Moves += 1
 
 	PieceFreeze($GRID, BagGetPiece(), $PieceA, $PieceX, $PieceY)
 	CheckLines()
@@ -2301,6 +2509,7 @@ EndFunc
 Func Tick()
 	Return MovePiece(0, 0, +1)
 EndFunc   ;==>Tick
+
 
 Func BagSet()
 	SetHotkeys(1)
@@ -2315,16 +2524,19 @@ Func BagSet()
 	$Q = InputBox($WTITLE, 'Set the queue (TLJZSOI)', $Q, '', 250, 130, $W[0]+$W[2]/2-125, $W[1]+$W[3]/2-65, 0, $GUI)
 	If @error Then Return
 
+	BagLoadFromString($Q)
+EndFunc
+Func BagLoadFromString($Q)
 	$Q = StringStripWS($Q, 8)
 	$Q = StringSplit  ($Q, '', 2)
+
 	For $i = 0 To UBound($Q) - 1
 		$Q[$i] = PieceGetID($Q[$i])
 	Next
-
-	PieceReset()
-
 	$Bag = $Q
 	$CHG = True
+
+	PieceReset()
 EndFunc
 Func BagFill()
 	Local $Fill
@@ -2394,8 +2606,24 @@ Func BagShuffle()
 
 	$CHG = True
 EndFunc
+Func BagMirror()
+	Local $Mirror = __MemCopy($Bag)
+	Local $LOOKUP[7] = [0, 5, 4, 3, 2, 1, 6]
+
+	For $i = 0 To UBound($Bag) - 1
+		If $Bag[$i] < 0 Or $Bag[$i] > 6 Then ContinueLoop
+		$Mirror[$i] = $LOOKUP[$Bag[$i]]
+	Next
+
+	$Bag = $Mirror
+	$CHG = True
+EndFunc
 Func BagReset()
 	$Bag = 0
+	If $StaticBag Then
+		BagLoadFromString(FileRead('piece_list.txt'))
+	EndIf
+
 	BagFill()
 EndFunc
 Func BagRandom($Min, $Max, $Flag)
@@ -2409,6 +2637,10 @@ Func BagRandom($Min, $Max, $Flag)
 
 	Return $Result
 EndFunc
+Func BagReseed()
+	$BagSeed = Random(0, 65535, 1)
+EndFunc
+
 
 Func HoldSet()
 	SetHotkeys(1)
@@ -2446,6 +2678,17 @@ Func HoldModeToggle()
 
 	$CHG = True
 EndFunc
+Func HoldMirror()
+	Local $LOOKUP[7] = [0, 5, 4, 3, 2, 1, 6]
+	If $PieceH >= 0 And $PieceH < UBound($LOOKUP) Then $PieceH = $LOOKUP[$PieceH]
+EndFunc
+Func HoldRandomize()
+	If $PieceH <> -1 Then
+		$PieceH = Random(0,6,1)
+	EndIf
+	$CHG = True
+EndFunc
+
 
 Func PieceReset()
 	$PieceX = Floor(UBound($GRID)/2) - 2
@@ -2483,9 +2726,11 @@ Func PieceHold()
 	Sound('hold')
 EndFunc   ;==>PieceHold
 
+
 Func StatsReset()
 	$Damage  = 0
 	$Lines   = 0
+	$Moves   = 0
 	$BtB     = False
 	$Perfect = False
 	$Swapped = False
@@ -2495,6 +2740,7 @@ Func StatsReset()
 	$B2BText    = ''
 	$AttackText = ''
 EndFunc
+
 
 Func GridReset()
 	Local $i, $j
@@ -2631,6 +2877,52 @@ Func GridShift($Direction)
 
 	$CHG = True
 EndFunc
+Func GridRoll($Direction)
+	Local $Mem = __MemCopy($GRID)
+
+	;shift right
+	While $Direction < 0
+		For $i = 0 To UBound($Mem, 1) - 1
+			For $j = 0 To UBound($Mem, 2) - 1
+				$GRID[$i][$j] = $Mem[Mod($i+UBound($Mem, 1)-1, UBound($Mem, 1))][$j]
+			Next
+		Next
+		$Direction += 1
+	WEnd
+
+	;shift left
+	While $Direction > 0
+		For $i = 0 To UBound($Mem, 1) - 1
+			For $j = 0 To UBound($Mem, 2) - 1
+				$GRID[$i][$j] = $Mem[Mod($i+1, UBound($Mem, 1))][$j]
+			Next
+		Next
+		$Direction -= 1
+	WEnd
+
+	$CHG = True
+EndFunc
+Func GridMirror()
+	NewUndo()
+
+	Local $Mirror = __MemCopy($GRID)
+	Local $LOOKUP[9] = [0,1,6,5,4,3,2,7,8]
+
+	For $i = 0 To UBound($GRID, 1) - 1
+		For $j = 0 To UBound($GRID, 2) - 1
+			$Mirror[UBound($GRID, 1) - 1 - $i][$j] = $LOOKUP[$GRID[$i][$j]]
+		Next
+	Next
+
+	$GRID = $Mirror
+	$CHG = True
+
+	If $MirrorQueue Then
+		BagMirror()
+		HoldMirror()
+	EndIf
+EndFunc
+
 
 Func HighlightReset()
 	For $i = 0 To UBound($HLIGHT, 1) - 1
@@ -2639,6 +2931,14 @@ Func HighlightReset()
 		Next
 	Next
 	$HighlightOn = False
+	$CHG = True
+EndFunc
+Func HighlightClear($Color)
+	For $i = 0 To UBound($HLIGHT, 1) - 1
+		For $j = 0 To UBound($HLIGHT, 2) - 1
+			If $HLIGHT[$i][$j] = $Color Then $HLIGHT[$i][$j] = 0
+		Next
+	Next
 	$CHG = True
 EndFunc
 Func HighlightModeToggle()
@@ -2796,12 +3096,18 @@ Func CheckTSpin()
 EndFunc   ;==>CheckTSpin
 Func CheckMini()
 	If $tSpin And $lKick <> 3 Then
+		If $PieceA = 0 Then _
+			Return Not (BlockIsFull($GRID, $PieceX + 2, $PieceY + 0) And _
+						BlockIsFull($GRID, $PieceX + 0, $PieceY + 0))
 		If $PieceA = 1 Then _
-			Return BlockIsFull($GRID, $PieceX + 2, $PieceY + 0) And _
-				   BlockIsFull($GRID, $PieceX + 2, $PieceY + 2)
+			Return Not (BlockIsFull($GRID, $PieceX + 0, $PieceY + 0) And _
+						BlockIsFull($GRID, $PieceX + 0, $PieceY + 2))
+		If $PieceA = 2 Then _
+			Return Not (BlockIsFull($GRID, $PieceX + 0, $PieceY + 2) And _
+						BlockIsFull($GRID, $PieceX + 2, $PieceY + 2))
 		If $PieceA = 3 Then _
-			Return BlockIsFull($GRID, $PieceX + 0, $PieceY + 0) And _
-				   BlockIsFull($GRID, $PieceX + 0, $PieceY + 2)
+ 			Return Not (BlockIsFull($GRID, $PieceX + 2, $PieceY + 2) And _
+						BlockIsFull($GRID, $PieceX + 2, $PieceY + 0))
 	EndIf
 
 	Return False
@@ -2896,7 +3202,7 @@ Func CheckLines()
 			Case 3
 				$AttackText = 'T-SPINTRIPLE'
 			Case 4
-				$AttackText = '      TETRIS'
+				$AttackText = ' FOUR  TRIS '
 		EndSwitch
 	ElseIf $LineClear <> 0 Then
 		$BtB = False
