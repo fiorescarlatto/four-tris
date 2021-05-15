@@ -1,3 +1,5 @@
+;This is a work in progress
+;this code does nothing for now.
 
 Func AI_Program()
 	Local $M = __MemCopy($GRID)
