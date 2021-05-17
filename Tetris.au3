@@ -1546,7 +1546,8 @@ EndFunc   ;==>DrawHold
 Func DrawScore($DRW)
 	Local $X
 	Local $M = ($Moves > 0) ? $Moves : 1
-	Local $APP = StringLeft(Round($Damage / $M, 4) & '000000', 6)
+	Local $APP = StringLeft(Round($Damage / $M, 4) + 1e-8, 6)
+	If $APP < 1e-6 Then $APP = 0
 
 	$X = $AlignL
 
