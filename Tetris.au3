@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 
 Opt('TrayIconHide', 1)
 FileChangeDir(@ScriptDir)
-SRandom(Number(@MSEC&@SEC&@MIN))
+SRandom(Number(@SEC&@MSEC))
 
 ;fixed DPI resizing 2222222222222
 DllCall('shcore.dll', 'uint', 'SetProcessDpiAwareness', 'uint', 2)
@@ -144,7 +144,7 @@ Global $HighlightOn   = False
 
 Global $StaticBag		= IniRead('settings.ini', 'OTHER', 'STATIC_BAG', False)			= 'True' ? True : False
 Global $ShuffleBag		= IniRead('settings.ini', 'OTHER', 'SHUFFLE_BAG', False)		= 'True' ? True : False
-Global $RandomHold		= IniRead('settings.ini', 'OTHER', 'RANDOM_HOLD', False)		= 'True' ? True : False
+Global $ShuffleHold		= IniRead('settings.ini', 'OTHER', 'SHUFFLE_HOLD', False)		= 'True' ? True : False
 Global $HighlightClear	= IniRead('settings.ini', 'OTHER', 'HIGHLIGHT_CLEAR', True)		= 'True' ? True : False
 Global $AutoColor		= IniRead('settings.ini', 'SETTINGS', 'AUTO_COLOR', True)		= 'True' ? True : False
 Global $GhostPiece		= IniRead('settings.ini', 'SETTINGS', 'GHOST_PIECE', True)		= 'True' ? True : False
@@ -259,7 +259,7 @@ SoundSetWaveVolume($VOLUME)
 ;key-code, action to perform, key pressed?, time of the last press/release, raising edge?
 Global Enum $KEYCODE, $KEYACTION, $KEYSTATE, $KEYTIME, $KEYEDGE
 Global		$KEYBINDS[14][5]
-Global		$HOTKEYS [ 5][2]
+Global		$HOTKEYS [ 6][2]
 
 ;edge
 $KEYBINDS[0 ][4] = 0
@@ -297,10 +297,10 @@ $KEYBINDS[13][1] = 'HighlightModeToggle'
 
 $HOTKEYS [0 ][1] = 'Undo'
 $HOTKEYS [1 ][1] = 'Redo'
-$HOTKEYS [2 ][1] = 'Copy'
-$HOTKEYS [3 ][1] = 'Paste'
-$HOTKEYS [4 ][1] = 'BagSet'
-;$HOTKEYS [5 ][1] = 'Settings'
+$HOTKEYS [2 ][1] = 'Redo'
+$HOTKEYS [3 ][1] = 'Copy'
+$HOTKEYS [4 ][1] = 'Paste'
+$HOTKEYS [5 ][1] = 'BagSet'
 
 ;keybind
 $KEYBINDS[0 ][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB0',  37)) ;LEFT
@@ -320,11 +320,11 @@ $KEYBINDS[12][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB17',  8)) ;BACK
 $KEYBINDS[13][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB18', 72)) ;H
 
 $HOTKEYS [0 ][0] = '^z'
-$HOTKEYS [1 ][0] = '^y'
-$HOTKEYS [2 ][0] = '^c'
-$HOTKEYS [3 ][0] = '^v'
-$HOTKEYS [4 ][0] = '^q'
-;$HOTKEYS [5 ][0] = '^s' ;settings
+$HOTKEYS [1 ][0] = '^+z'
+$HOTKEYS [2 ][0] = '^y'
+$HOTKEYS [3 ][0] = '^c'
+$HOTKEYS [4 ][0] = '^v'
+$HOTKEYS [5 ][0] = '^q'
 
 Global $KEYACTIVE = False
 
@@ -542,13 +542,23 @@ $SETTINGS[19][6] = 0
 #EndRegion
 #Region TESTING
 Func TestFunction()
-
+	If Not $DEBUG Then Return
 EndFunc
 
+Func TestRNG()
+	Local $RNG[14][2]
 
-Func TestFunction1()
-	If Not $DEBUG Then Return
+	For $i = 0 To 99999
+		$RNG[Random(0,13, 1)][0] += 1
+	Next
+	For $i = 0 To 99999
+		$RNG[Random(0,13, 1)][1] += 1
+		If Mod($i, 7) = 0 Then SRandom(Random(0,65532,1))
+	Next
 
+	_ArrayDisplay($RNG)
+EndFunc
+Func TestFiltering()
 	Local $Filter[4][6] = [ _
 	[2,2,2,2,2,3], _
 	[2,0,0,0,0,2], _
@@ -2162,10 +2172,9 @@ EndFunc
 Func Paste()
 	If StateDecode(ClipGet()) Then
 		If $ShuffleBag Then
+			If $ShuffleHold Then HoldShuffle()
 			BagShuffle()
 			BagReseed()
-
-			If $RandomHold Then HoldRandomize()
 		EndIf
 
 	;StateDecode() Failed, Clipboard contains BMP?
@@ -2508,10 +2517,6 @@ EndFunc
 Func Drop()
 	If $Lost Then Return
 
-	$KEYBINDS[0][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
-	$KEYBINDS[1][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
-	$tARR = 0
-
 	Do
 	Until Not MovePiece(0, 0, +1)
 
@@ -2562,26 +2567,29 @@ Func BagFill()
 	While UBound($Bag) < 7
 		$Fill = __MemCopy($BagPieces)
 
+		BagSeed()
 		Switch $BagType
 			Case 0 ;7-Bag
 				For $i = 0 To UBound($Fill) - 1
-					__Swap($Fill[$i], $Fill[BagRandom($i, UBound($Fill) - 1, 1)])
+					__Swap($Fill[$i], $Fill[Random($i, UBound($Fill) - 1, 1)])
 				Next
 
 			Case 1 ;14-Bag
 				__Concat($Fill, $BagPieces)
 				For $i = 0 To UBound($Fill) - 1
-					__Swap($Fill[$i], $Fill[BagRandom($i, UBound($Fill) - 1, 1)])
+					__Swap($Fill[$i], $Fill[Random($i, UBound($Fill) - 1, 1)])
 				Next
 
-			Case 2 ;Random
+			Case 2 ;Random-Bag
 				For $i = 0 To UBound($Fill) - 1
-					$Fill[$i] = $BagPieces[BagRandom(0, UBound($BagPieces) - 1, 1)]
+					$Fill[$i] = $BagPieces[Random(0, UBound($BagPieces) - 1, 1)]
 				Next
 		EndSwitch
+		BagReseed()
 
 		__Concat($Bag, $Fill)
 	WEnd
+
 EndFunc
 Func BagNext()
 	BagFill()
@@ -2644,16 +2652,8 @@ Func BagReset()
 
 	BagFill()
 EndFunc
-Func BagRandom($Min, $Max, $Flag)
-	Local $Result, $Seed
-	$Seed = Random(0, 2147483647, 1)
-
+Func BagSeed()
 	SRandom($BagSeed)
-	$BagSeed = Random(0, 65535, 1)
-	$Result  = Random($Min, $Max, $Flag)
-	SRandom($Seed)
-
-	Return $Result
 EndFunc
 Func BagReseed()
 	$BagSeed = Random(0, 65535, 1)
@@ -2700,10 +2700,14 @@ Func HoldMirror()
 	Local $LOOKUP[7] = [0, 5, 4, 3, 2, 1, 6]
 	If $PieceH >= 0 And $PieceH < UBound($LOOKUP) Then $PieceH = $LOOKUP[$PieceH]
 EndFunc
-Func HoldRandomize()
+Func HoldShuffle()
+	Local $BagSeparator
+
 	If $PieceH <> -1 Then
-		$PieceH = Random(0,6,1)
+		$BagSeparator = BagGetSeparator()
+		__Swap($PieceH, $Bag[Random($BagSeparator[0], $BagSeparator[1], 1)])
 	EndIf
+
 	$CHG = True
 EndFunc
 
@@ -2716,11 +2720,16 @@ Func PieceReset()
 	$tSpin    = False
 	$tGravity = TimerDiff($GTimer) + (1000 / $Gravity)
 
+	;resets ARR so that the piece will not teleport to the side
+	$KEYBINDS[0][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
+	$KEYBINDS[1][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
+	$tARR = 0
+
 	$CHG = True
 EndFunc   ;==>PieceReset
 Func PieceNext()
-	PieceReset()
 	BagNext()
+	PieceReset()
 
 	$Swapped = False
 	$CHG = True
