@@ -314,8 +314,8 @@ $KEYBINDS[7 ][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB7', 160)) ;LSHI
 $KEYBINDS[8 ][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB8', 115)) ;F4
 $KEYBINDS[9 ][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB9',  13)) ;ENTER
 
-$KEYBINDS[10][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB11', 71)) ;G
-$KEYBINDS[11][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB12', 52)) ;4
+$KEYBINDS[10][0] = 0;Number(IniRead('settings.ini', 'SETTINGS', 'KB11', 71)) ;G
+$KEYBINDS[11][0] = 0;Number(IniRead('settings.ini', 'SETTINGS', 'KB12', 52)) ;4
 $KEYBINDS[12][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB17',  8)) ;BACKSPACE
 $KEYBINDS[13][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB18', 72)) ;H
 
