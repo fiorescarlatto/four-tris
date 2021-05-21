@@ -3240,7 +3240,7 @@ Func CheckLines()
 			If $LineClear = 0 Then GridSpawnGarbage()
 		Case 2 ;4wide
 			If $LineClear = 0 Then lose_game()
-			AddWide()
+			AddWide($LineClear)
 		Case 3 ;pco
 	EndSwitch
 EndFunc
@@ -3268,13 +3268,15 @@ Func PushLine(ByRef $GRID, $Line)
 		$GRID[$i][$Line] = 0
 	Next
 EndFunc
-Func AddWide()
+Func AddWide($Amount = 1)
 	Local $Hole = Floor(UBound($GRID)/2) - 2
 
-	For $i = 0 To UBound($GRID) - 1
-		If $i < $Hole Or $i > $Hole+3 Then
-			$GRID[$i][0] = 8
-		EndIf
+	For $j = 0 To $Amount
+		For $i = 0 To UBound($GRID) - 1
+			If $i < $Hole Or $i > $Hole+3 Then
+				$GRID[$i][$j] = 8
+			EndIf
+		Next
 	Next
 
 	$CHG = True
