@@ -91,6 +91,9 @@ Global $GridX  = 95             + (($WSize[0] - 190) - $GRID_S * $GRID_X   ) / 2
 Global $GridY  = 12 + 2*$GRID_S + (($WSize[1] -  33) - $GRID_S *($GRID_Y+2)) / 2 ;game grid position Y
 Global $GBounds  = BoundBox($GridX, $GridY, $GRID_X * $GRID_S, $GRID_Y * $GRID_S)
 
+;Popup information window
+Global $CommentInfo[5] = [0,0,'','',False]
+
 ;current piece and hold
 Global $PieceX
 Global $PieceY
@@ -118,9 +121,11 @@ Global $GarbageType   = StringSplit($GarbageString, ',', 2)
 Global $GarbageAlternates = True
 
 ;game variables
+Global Enum $GM_TRAINING, $GM_CHEESE, $GM_PC, $GM_FOUR, $GM_MASTER
 Global $GAMEMODE   = 0
 Global $Gravity    = 0
 Global $Stickyness = 0
+Global $PCLeftover = 7
 
 Global $Damage	= 0 ;damage sent
 Global $Lines	= 0 ;lines cleared
@@ -258,7 +263,7 @@ SoundSetWaveVolume($VOLUME)
 #Region KEYBINDS
 ;key-code, action to perform, key pressed?, time of the last press/release, raising edge?
 Global Enum $KEYCODE, $KEYACTION, $KEYSTATE, $KEYTIME, $KEYEDGE
-Global		$KEYBINDS[14][5]
+Global		$KEYBINDS[21][5]
 Global		$HOTKEYS [ 6][2]
 
 ;edge
@@ -278,22 +283,38 @@ $KEYBINDS[11][4] = 1
 $KEYBINDS[12][4] = 1
 $KEYBINDS[13][4] = 1
 
-;functions
-$KEYBINDS[0 ][1] = 'MoveL'
-$KEYBINDS[1 ][1] = 'MoveR'
-$KEYBINDS[2 ][1] = 'MoveD'
-$KEYBINDS[3 ][1] = 'Drop'
-$KEYBINDS[4 ][1] = 'PieceHold'
-$KEYBINDS[5 ][1] = 'RotateCCW'
-$KEYBINDS[6 ][1] = 'RotateCW'
-$KEYBINDS[7 ][1] = 'Rotate180'
-$KEYBINDS[8 ][1] = 'clear_board'
-$KEYBINDS[9 ][1] = 'GridClearFullLines'
+$KEYBINDS[14][4] = 1
+$KEYBINDS[15][4] = 1
+$KEYBINDS[16][4] = 1
+$KEYBINDS[17][4] = 1
+$KEYBINDS[18][4] = 1
+$KEYBINDS[19][4] = 1
+$KEYBINDS[20][4] = 1
 
-$KEYBINDS[10][1] = 'GridSpawnGarbage'
-$KEYBINDS[11][1] = 'GridSpawn4W'
-$KEYBINDS[12][1] = 'HighlightReset'
-$KEYBINDS[13][1] = 'HighlightModeToggle'
+;functions
+$KEYBINDS[0 ][1] = 'MoveL()'
+$KEYBINDS[1 ][1] = 'MoveR()'
+$KEYBINDS[2 ][1] = 'MoveD()'
+$KEYBINDS[3 ][1] = 'Drop()'
+$KEYBINDS[4 ][1] = 'PieceHold()'
+$KEYBINDS[5 ][1] = 'RotateCCW()'
+$KEYBINDS[6 ][1] = 'RotateCW()'
+$KEYBINDS[7 ][1] = 'Rotate180()'
+$KEYBINDS[8 ][1] = 'clear_board()'
+$KEYBINDS[9 ][1] = 'GridClearFullLines()'
+
+$KEYBINDS[10][1] = 'GridSpawnGarbage()'
+$KEYBINDS[11][1] = 'GridSpawn4W()'
+$KEYBINDS[12][1] = 'HighlightReset()'
+$KEYBINDS[13][1] = 'HighlightModeToggle()'
+
+$KEYBINDS[14][1] = 'PCSetLeftover(1)'
+$KEYBINDS[15][1] = 'PCSetLeftover(2)'
+$KEYBINDS[16][1] = 'PCSetLeftover(3)'
+$KEYBINDS[17][1] = 'PCSetLeftover(4)'
+$KEYBINDS[18][1] = 'PCSetLeftover(5)'
+$KEYBINDS[19][1] = 'PCSetLeftover(6)'
+$KEYBINDS[20][1] = 'PCSetLeftover(7)'
 
 $HOTKEYS [0 ][1] = 'Undo'
 $HOTKEYS [1 ][1] = 'Redo'
@@ -318,6 +339,14 @@ $KEYBINDS[10][0] = 0;Number(IniRead('settings.ini', 'SETTINGS', 'KB11', 71)) ;G
 $KEYBINDS[11][0] = 0;Number(IniRead('settings.ini', 'SETTINGS', 'KB12', 52)) ;4
 $KEYBINDS[12][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB17',  8)) ;BACKSPACE
 $KEYBINDS[13][0] = Number(IniRead('settings.ini', 'SETTINGS', 'KB18', 72)) ;H
+
+$KEYBINDS[14][0] = 49 ;1
+$KEYBINDS[15][0] = 50 ;2
+$KEYBINDS[16][0] = 51 ;3
+$KEYBINDS[17][0] = 52 ;4
+$KEYBINDS[18][0] = 53 ;5
+$KEYBINDS[19][0] = 54 ;6
+$KEYBINDS[20][0] = 55 ;7
 
 $HOTKEYS [0 ][0] = '^z'
 $HOTKEYS [1 ][0] = '^+z'
@@ -543,8 +572,24 @@ $SETTINGS[19][6] = 0
 #Region TESTING
 Func TestFunction()
 	If Not $DEBUG Then Return
+	TestPCBag()
 EndFunc
 
+Func TestPCBag()
+	Local $Size = 4
+
+	Local $Fill = __MemCopy($BagPieces)
+	For $i = 0 To UBound($Fill) - 1
+		__Swap($Fill[$i], $Fill[Random($i, UBound($Fill) - 1, 1)])
+	Next
+	ReDim $Fill[$Size]
+
+	$Bag = $Fill
+	$CHG = True
+
+	HoldReset()
+	BagFill()
+EndFunc
 Func TestRNG()
 	Local $RNG[14][2]
 
@@ -654,15 +699,15 @@ Func FilterMatches(ByRef $GRID, ByRef $Filter, $x, $y)
 	Return $Matching
 EndFunc
 Func FilterGrid(ByRef $GRID, ByRef $Filter)
-	Local $P[UBound($GRID, 1)][UBound($GRID, 2)]
+	Local $Matching[UBound($GRID, 1)][UBound($GRID, 2)]
 
 	For $x = 0 To UBound($GRID, 1) - UBound($Filter, 1)
 		For $y = 0 To UBound($GRID, 2) - UBound($Filter, 2)
-			$P[$x][$y] = FilterMatches($GRID, $Filter, $x, $y)
+			$Matching[$x][$y] = FilterMatches($GRID, $Filter, $x, $y)
 		Next
 	Next
 
-	Return $P
+	Return $Matching
 EndFunc
 Func FilterMirror(ByRef $Filter)
 	Local $Mirror[UBound($Filter, 1)][UBound($Filter, 2)]
@@ -827,7 +872,7 @@ Func KeyProc($nCode, $wParam, $lParam)
 					If Not $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
 						$KEYBINDS[$i][$KEYSTATE] = True
 						$KEYBINDS[$i][$KEYTIME ] = $msgTime
-						If Not $KEYBINDS[$i][$KEYEDGE] Then Call($KEYBINDS[$i][$KEYACTION])
+						If Not $KEYBINDS[$i][$KEYEDGE] Then Execute($KEYBINDS[$i][$KEYACTION])
 					EndIf
 				Next
 
@@ -836,7 +881,7 @@ Func KeyProc($nCode, $wParam, $lParam)
 					If $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
 						$KEYBINDS[$i][$KEYSTATE] = False
 						$KEYBINDS[$i][$KEYTIME ] = $msgTime
-						If $KEYBINDS[$i][$KEYEDGE] Then Call($KEYBINDS[$i][$KEYACTION])
+						If $KEYBINDS[$i][$KEYEDGE] Then Execute($KEYBINDS[$i][$KEYACTION])
 					EndIf
 				Next
 			EndIf
@@ -1114,21 +1159,31 @@ EndFunc
 
 
 Func SwitchMode()
-	SetMode(Mod($GAMEMODE+1, 4))
+	SetMode(Mod($GAMEMODE+1, 5))
 EndFunc
 Func SetMode($Mode)
 	$GAMEMODE = $Mode
 	Switch $GAMEMODE
-		Case 0 ;training
-			$Gravity = 0
+		Case $GM_TRAINING ;training
+			DeleteComment()
 			$BUTTONTEXT[$MODEBUTTON] = 'TRAINING  MODE  '
-		Case 1 ;cheese race
+			$Gravity = 0
+		Case $GM_CHEESE ;cheese race
+			DeleteComment()
 			$BUTTONTEXT[$MODEBUTTON] = ' CHEESE   MODE  '
-		Case 2 ;4wide
+			$Gravity = 0
+		Case $GM_FOUR ;4wide
+			DeleteComment()
 			$BUTTONTEXT[$MODEBUTTON] = '  FOUR    MODE  '
-		Case 3 ;master mode
+			$Gravity = 0
+		Case $GM_MASTER ;master mode
+			DeleteComment()
 			$BUTTONTEXT[$MODEBUTTON] = ' MASTER   MODE  '
 			$Gravity = 1000
+		Case $GM_PC ;perfect-clear mode
+			DrawComment(0, 1750, 'PC MODE', 'Use KEYS 1-7 to set the Nth. PC.')
+			$BUTTONTEXT[$MODEBUTTON] = '   PC     MODE  '
+			$Gravity = 0
 	EndSwitch
 	clear_board()
 EndFunc
@@ -1870,60 +1925,72 @@ Func DrawTransition($DRW, $Time)
 	WEnd
 EndFunc
 Func DrawComment($DRW, $Time = 0, $Title = '', $Comment = '')
-	Local Static $Info[5] = [0,0,'','',False]
 	Local $Timer
 
 	If $Time <> 0 And ($Title <> '' Or $Comment <> '') Then
-		$Info[0] = TimerDiff($GTimer)
-		$Info[1] = $Time
-		$Info[2] = $Title
-		$Info[3] = $Comment
+		$CommentInfo[0] = TimerDiff($GTimer)
+		$CommentInfo[1] = $Time
+		$CommentInfo[2] = $Title
+		$CommentInfo[3] = $Comment
 
 		$ANIMATION_PLAYING = True
 		Return
 	EndIf
 
-	$Timer = TimerDiff($GTimer) - $Info[0]
+	$Timer = TimerDiff($GTimer) - $CommentInfo[0]
 
 	;if ended draw taller
-	If $Info[4] Then
-		_WinAPI_FillRect($DRW, Rect(10, $AlignB, $WSize[0]-20, 20), $Brush[5])
+	If $CommentInfo[4] Then
+		_WinAPI_FillRect ($DRW, Rect(10, $AlignB, $WSize[0]-20, 20), $Brush[$CBOX])
+		_WinAPI_FrameRect($DRW, Rect(10, $AlignB, $WSize[0]-20, 20), $Brush[$CTXT])
 
 		_WinAPI_SelectObject($DRW, $Font9)
 		_WinAPI_SetBkColor  ($DRW, $Color[5])
 		_WinAPI_SetTextColor($DRW, $Color[$CTXT])
 
-		_WinAPI_DrawText($DRW, $Info[3], Rect(10, $AlignB, $WSize[0]-20, 20), $DT_CENTER)
+		_WinAPI_DrawText($DRW, $CommentInfo[3], Rect(10, $AlignB, $WSize[0]-20, 20), $DT_CENTER)
 	Else
-		_WinAPI_FillRect($DRW, Rect(10, $AlignB+10, $WSize[0]-20, 20), $Brush[5])
+		_WinAPI_FillRect ($DRW, Rect(10, $AlignB+10, $WSize[0]-20, 20), $Brush[$CBOX])
+		_WinAPI_FrameRect($DRW, Rect(10, $AlignB+10, $WSize[0]-20, 20), $Brush[$CTXT])
 	EndIf
 
 
-	If $Timer < $Info[1] Then
+	If $Timer < $CommentInfo[1] Then
 		Local $X, $Y
 		Local $T
 
-		$T = ($Info[1] - $Timer) / $Info[1]
+		$T = ($CommentInfo[1] - $Timer) / $CommentInfo[1]
 		$Y = $WSize[1]/7 * Popup($T)
 		$X = 4
 
-		If $T < 0.5 Then $Info[4] = True
+		If $T < 0.5 Then $CommentInfo[4] = True
 
-		_WinAPI_FillRect($DRW, Rect(10, $WSize[1]-$Y, $WSize[0]-20, $Y), $Brush[5])
+		_WinAPI_FillRect ($DRW, Rect(10, $WSize[1]-$Y, $WSize[0]-20, $Y+0), $Brush[$CBOX])
+		_WinAPI_FrameRect($DRW, Rect(10, $WSize[1]-$Y, $WSize[0]-20, $Y+5), $Brush[$CTXT])
 
 		_WinAPI_SelectObject($DRW, $Font30)
 		_WinAPI_SetBkColor  ($DRW, $Color[5])
 		_WinAPI_SetTextColor($DRW, $Color[$CTXT])
-		_WinAPI_DrawText($DRW, $Info[2], Rect(10, $WSize[1]-$Y + $X, $WSize[0]-20, 55), $DT_CENTER)
+		_WinAPI_DrawText($DRW, $CommentInfo[2], Rect(10, $WSize[1]-$Y + $X, $WSize[0]-20, 55), $DT_CENTER)
 
-		$X += $Info[2] = '' ? 14 : 53
+		$X += $CommentInfo[2] = '' ? 14 : 53
 
 		_WinAPI_SelectObject($DRW, $Font20)
-		_WinAPI_DrawText($DRW, $Info[3], Rect(10, $WSize[1]-$Y + $X, $WSize[0]-20, $Y), $DT_CENTER)
+		_WinAPI_DrawText($DRW, $CommentInfo[3], Rect(10, $WSize[1]-$Y + $X, $WSize[0]-20, $Y), $DT_CENTER)
 	Else
 		$ANIMATION_PLAYING = False
 	EndIf
 EndFunc
+Func DeleteComment()
+	$CommentInfo[0] = 0
+	$CommentInfo[1] = 0
+	$CommentInfo[2] = ''
+	$CommentInfo[3] = ''
+	$CommentInfo[4] = False
+
+	$ANIMATION_PLAYING = False
+EndFunc
+
 
 ;X from 1 to 0
 Func Popup($X)
@@ -2229,12 +2296,12 @@ Func SnapScreen()
 
 	Local $tPos    = _WinAPI_GetMousePos()
 	Local $Monitor = _WinAPI_MonitorFromPoint($tPos)
-	Local $Info    = _WinAPI_GetMonitorInfo($Monitor)
+	Local $Info    = (_WinAPI_GetMonitorInfo($Monitor))[0]
 	Local $Size[4]
-	$Size[0] = DllStructGetData($Info[0], 1)
-	$Size[1] = DllStructGetData($Info[0], 2)
-	$Size[2] = DllStructGetData($Info[0], 3)
-	$Size[3] = DllStructGetData($Info[0], 4)
+	$Size[0] = DllStructGetData($Info, 1)
+	$Size[1] = DllStructGetData($Info, 2)
+	$Size[2] = DllStructGetData($Info, 3)
+	$Size[3] = DllStructGetData($Info, 4)
 	Local $Bounds = BoundBox($Size[0], $Size[1], $Size[2]-$Size[0], $Size[3]-$Size[1])
 
 	Local $W = $Size[2] - $Size[0]
@@ -2312,11 +2379,11 @@ Func SnapScreen()
 		If Not Bounds(MouseGetPos(), $Bounds) Then
 			$tPos    = _WinAPI_GetMousePos()
 			$Monitor = _WinAPI_MonitorFromPoint($tPos)
-			$Info    = _WinAPI_GetMonitorInfo($Monitor)
-			$Size[0] = DllStructGetData($Info[0], 1)
-			$Size[1] = DllStructGetData($Info[0], 2)
-			$Size[2] = DllStructGetData($Info[0], 3)
-			$Size[3] = DllStructGetData($Info[0], 4)
+			$Info    = (_WinAPI_GetMonitorInfo($Monitor))[0]
+			$Size[0] = DllStructGetData($Info, 1)
+			$Size[1] = DllStructGetData($Info, 2)
+			$Size[2] = DllStructGetData($Info, 3)
+			$Size[3] = DllStructGetData($Info, 4)
 			$Bounds  = BoundBox($Size[0], $Size[1], $Size[2]-$Size[0], $Size[3]-$Size[1])
 
 			$W = $Size[2] - $Size[0]
@@ -2432,7 +2499,7 @@ Func GameInput()
 	If $DAS_DIR = 'L' Then
 		If $KEYBINDS[0][$KEYSTATE] Then
 			While $KEYBINDS[0][$KEYTIME] + $DAS + $tARR < _WinAPI_GetTickCount()
-				If Not MovePiece(0,-1,0) Then ExitLoop
+				If Not PieceMove(0,-1,0) Then ExitLoop
 				$tARR += $ARR
 				If $ARR > 15 Then Sound('move')
 			WEnd
@@ -2447,7 +2514,7 @@ Func GameInput()
 	ElseIf $DAS_DIR = 'R' Then
 		If $KEYBINDS[1][$KEYSTATE] Then
 			While $KEYBINDS[1][$KEYTIME] + $DAS + $tARR < _WinAPI_GetTickCount()
-				If Not MovePiece(0,+1,0) Then ExitLoop
+				If Not PieceMove(0,+1,0) Then ExitLoop
 				$tARR += $ARR
 				If $ARR > 15 Then Sound('move')
 			WEnd
@@ -2463,22 +2530,22 @@ Func GameInput()
 	Local $tSDS = 0
 	If $KEYBINDS[2][$KEYSTATE] Then
 		While $KEYBINDS[2][$KEYTIME] + $SDD + $tSDS < _WinAPI_GetTickCount()
-			If Not MovePiece(0,0,+1) Then ExitLoop
+			If Not PieceMove(0,0,+1) Then ExitLoop
 			$tSDS += 128/$SDS
 		WEnd
 	EndIf
 EndFunc   ;==>GameInput
 Func RotateCCW()
 	If $Lost Then Return
-	Return MovePiece(1, 0, 0)
+	Return PieceMove(1, 0, 0)
 EndFunc   ;==>RotateL
 Func RotateCW()
 	If $Lost Then Return
-	Return MovePiece(3, 0, 0)
+	Return PieceMove(3, 0, 0)
 EndFunc   ;==>RotateR
 Func Rotate180()
 	If $Lost Then Return
-	Return MovePiece(2, 0, 0)
+	Return PieceMove(2, 0, 0)
 EndFunc
 Func MoveL()
 	If $Lost Then Return
@@ -2491,7 +2558,7 @@ Func MoveL()
 		$DAS_DIR = ''
 	EndIf
 
-	Return MovePiece(0, -1, 0)
+	Return PieceMove(0, -1, 0)
 EndFunc
 Func MoveR()
 	If $Lost Then Return
@@ -2504,21 +2571,21 @@ Func MoveR()
 		$DAS_DIR = ''
 	EndIf
 
-	Return MovePiece(0, +1, 0)
+	Return PieceMove(0, +1, 0)
 EndFunc
 Func MoveD()
 	If $Lost Then Return
-	Return MovePiece(0, 0, +1)
+	Return PieceMove(0, 0, +1)
 EndFunc
 Func MoveU()
 	If $Lost Then Return
-	Return MovePiece(0, 0, -1)
+	Return PieceMove(0, 0, -1)
 EndFunc
 Func Drop()
 	If $Lost Then Return
 
 	Do
-	Until Not MovePiece(0, 0, +1)
+	Until Not PieceMove(0, 0, +1)
 
 	NewUndo()
 	Sound('drop')
@@ -2530,7 +2597,7 @@ Func Drop()
 	PieceNext()
 EndFunc
 Func Tick()
-	Return MovePiece(0, 0, +1)
+	Return PieceMove(0, 0, +1)
 EndFunc   ;==>Tick
 
 
@@ -2616,7 +2683,7 @@ Func BagGetSeparator()
 
 	While $BagCount <= UBound($Bag)
 		$BagSeparator &= '|' & $BagCount
-		$BagCount += 7
+		$BagCount += ($BagType+1)*7
 	WEnd
 
 	Return StringSplit($BagSeparator, '|', 2)
@@ -2657,6 +2724,56 @@ Func BagSeed()
 EndFunc
 Func BagReseed()
 	$BagSeed = Random(0, 65535, 1)
+EndFunc
+
+
+Func PCSetLeftover($Leftover)
+	If $GAMEMODE <> $GM_PC Then Return
+
+	Local $PCSizes[7] = [7,4,1,5,2,6,3]
+	Local $Comment
+
+	$PCLeftover = $PCSizes[$Leftover-1]
+	Switch $Leftover
+		Case 1
+			$Comment = '1st'
+		Case 2
+			$Comment = '2nd'
+		Case 3
+			$Comment = '3rd'
+		Case Else
+			$Comment = $Leftover&'th.'
+	EndSwitch
+
+	DrawComment(0, 1000, $Comment&' PC', 'Bag leftover: '&$PCLeftover&' pieces.')
+	clear_board()
+EndFunc
+Func PCSetBag($Leftover)
+	Local $Fill
+
+	Do
+		$Fill = __MemCopy($BagPieces)
+		For $i = 0 To UBound($Fill) - 1
+			__Swap($Fill[$i], $Fill[Random($i, UBound($Fill) - 1, 1)])
+		Next
+		ReDim $Fill[$Leftover]
+	Until Not PCRerollBag($Fill)
+
+	$Bag = $Fill
+	$CHG = True
+
+	HoldReset()
+	BagFill()
+EndFunc
+Func PCRerollBag(ByRef $Bag)
+	If UBound($Bag) <> 4 Then Return False
+	Local $P[7]
+
+	For $i = 0 To UBound($Bag) - 1
+		$P[$Bag[$i]] = 1
+	Next
+
+	Return ($P[1] And $P[5] And $P[6]); has [J,L,T]
 EndFunc
 
 
@@ -2982,12 +3099,14 @@ Func clear_board()
 	PieceReset()
 
 	Switch $GAMEMODE
-		Case 0 ;standard
-		Case 1 ;cheese rush
+		Case $GM_TRAINING	;training mode
+		Case $GM_CHEESE 	;cheese mode
 			GridSpawnGarbage()
-		Case 2 ;combo training
+		Case $GM_FOUR		;4wide mode
 			GridSpawn4W()
-		Case 3 ;master mode
+		Case $GM_MASTER		;master mode
+		Case $GM_PC			;pc training
+			PCSetBag($PCLeftover)
 	EndSwitch
 EndFunc   ;==>clear_board
 Func lose_game()
@@ -2995,118 +3114,6 @@ Func lose_game()
 	$Lost = True
 
 	Sound('lose')
-EndFunc
-
-
-Func MovePiece($Angle, $X, $Y)
-	Local $Rotation = $Angle
-	Local $Sound
-
-	$Angle = Mod($PieceA + $Angle, 4)
-	$X = $PieceX + $X
-	$Y = $PieceY + $Y
-
-	If PieceFits(BagGetPiece(), $Angle, $X, $Y) Then
-		$PieceA = $Angle
-		$PieceX = $X
-		$PieceY = $Y
-
-		$tSpin = ($Rotation <> 0) And CheckTSpin()
-		$sMini = ($Rotation <> 0) And CheckMini()
-		$Sound = ($Rotation <> 0) And $tSpin ? Sound('kick') : Sound('rotate')
-
-		$CHG = True
-		Return True
-	Else
-		If $Rotation <> 0 Then ;trying to rotate
-			If KickPiece($Angle, $X, $Y, $Rotation) Then
-				$PieceA = $Angle
-				$PieceX = $X
-				$PieceY = $Y
-
-				$tSpin = CheckTSpin()
-				$sMini = CheckMini()
-				$Sound = $tSpin ? Sound('kick') : Sound('rotate')
-
-				$CHG = True
-				Return True
-			Else
-				Return False
-			EndIf
-		Else
-			Return False
-		EndIf
-	EndIf
-EndFunc
-Func KickPiece(ByRef $Angle, ByRef $X, ByRef $Y, $Rotation)
-	Local $Piece = BagGetPiece()
-
-	If $Piece = 0 Then ;I piece
-		Switch $Rotation
-			Case 1 ;CCW
-				Local $Offset[4][4][2] = [ _
-				[[+2, 0],[-1, 0],[+2,-1],[-1,+2]], _
-				[[-1, 0],[+2, 0],[-1,-2],[+2,+1]], _
-				[[-2, 0],[+1, 0],[-2,+1],[+1,-2]], _
-				[[+1, 0],[-2, 0],[+1,+2],[-2,+1]]]
-			Case 3 ;CW
-				Local $Offset[4][4][2] = [ _
-				[[+1, 0],[-2, 0],[+1,+2],[-2,-1]], _
-				[[+2, 0],[-1, 0],[+2,-1],[-1,+2]], _
-				[[-1, 0],[+2, 0],[-1,-2],[+2,+1]], _
-				[[-2, 0],[+1, 0],[-2,+1],[+1,-2]]]
-			Case Else
-				Return False
-		EndSwitch
-	Else
-		Switch $Rotation
-			Case 1 ;CCW
-				Local $Offset[4][4][2] = [ _
-				[[+1, 0],[+1,+1],[ 0,-2],[+1,-2]], _
-				[[+1, 0],[+1,-1],[ 0,+2],[+1,+2]], _
-				[[-1, 0],[-1,+1],[ 0,-2],[-1,-2]], _
-				[[-1, 0],[-1,-1],[ 0,+2],[-1,+2]]]
-			Case 2 ;180
-				Local $Offset[4][5][2] = [ _
-				[[ 0,+1],[-1,+1],[+1,+1],[-1, 0],[+1, 0]], _
-				[[+1, 0],[+1,-2],[+1,-1],[ 0,-2],[ 0,-1]], _
-				[[ 0,-1],[+1,-1],[-1,-1],[+1, 0],[-1, 0]], _
-				[[-1, 0],[-1,+2],[-1,-1],[ 0,-2],[ 0,-1]]]
-			Case 3 ;CW
-				Local $Offset[4][4][2] = [ _
-				[[-1, 0],[-1,+1],[ 0,-2],[-1,-2]], _
-				[[+1, 0],[+1,-1],[ 0,+2],[+1,+2]], _
-				[[+1, 0],[+1,+1],[ 0,-2],[+1,-2]], _
-				[[-1, 0],[-1,-1],[ 0,+2],[-1,+2]]]
-			Case Else
-				Return False
-		EndSwitch
-	EndIf
-
-	For $i = 0 To UBound($Offset, 2) - 1
-		If PieceFits($Piece, $Angle, $X + $Offset[$Angle][$i][0], $Y + $Offset[$Angle][$i][1]) Then
-			$X += $Offset[$Angle][$i][0]
-			$Y += $Offset[$Angle][$i][1]
-			$lKick = $i
-			Return True
-		EndIf
-	Next
-
-	Return False
-EndFunc
-Func PieceFits($Piece, $Angle, $X, $Y)
-	Local $Shape = PieceGetShape($Piece, $Angle)
-	Local $i, $j
-
-	For $i = 0 To UBound($Shape, 1) - 1
-		For $j = 0 To UBound($Shape, 2) - 1
-			If BlockIsFull($GRID, $X+$i, $Y+$j) And $Shape[$i][$j] Then
-				Return False
-			EndIf
-		Next
-	Next
-
-	Return True
 EndFunc
 
 Func CheckTSpin()
@@ -3139,6 +3146,7 @@ Func CheckMini()
 
 	Return False
 EndFunc
+
 
 Func BlockIsFull(ByRef Const $GRID, $X, $Y)
 	Return BlockOutOfBounds($GRID, $X, $Y) Or $GRID[$X][$Y]
@@ -3236,12 +3244,12 @@ Func CheckLines()
 	EndIf
 
 	Switch $GAMEMODE
-		Case 1 ;cheese_race
+		Case $GM_CHEESE	;cheese_race
 			If $LineClear = 0 Then GridSpawnGarbage()
-		Case 2 ;4wide
+		Case $GM_FOUR ;4wide
 			If $LineClear = 0 Then lose_game()
 			AddWide($LineClear)
-		Case 3 ;pco
+		Case $GM_PC ;pco
 	EndSwitch
 EndFunc
 Func ClearLine(ByRef $GRID, $Line)
@@ -3283,6 +3291,116 @@ Func AddWide($Amount = 1)
 EndFunc
 
 
+Func PieceMove($Angle, $X, $Y)
+	Local $Rotation = $Angle
+	Local $Sound
+
+	$Angle = Mod($PieceA + $Angle, 4)
+	$X = $PieceX + $X
+	$Y = $PieceY + $Y
+
+	If PieceFits(BagGetPiece(), $Angle, $X, $Y) Then
+		$PieceA = $Angle
+		$PieceX = $X
+		$PieceY = $Y
+
+		$tSpin = ($Rotation <> 0) And CheckTSpin()
+		$sMini = ($Rotation <> 0) And CheckMini()
+		$Sound = ($Rotation <> 0) And $tSpin ? Sound('kick') : Sound('rotate')
+
+		$CHG = True
+		Return True
+	Else
+		If $Rotation <> 0 Then ;trying to rotate
+			If PieceKick($Angle, $X, $Y, $Rotation) Then
+				$PieceA = $Angle
+				$PieceX = $X
+				$PieceY = $Y
+
+				$tSpin = CheckTSpin()
+				$sMini = CheckMini()
+				$Sound = $tSpin ? Sound('kick') : Sound('rotate')
+
+				$CHG = True
+				Return True
+			Else
+				Return False
+			EndIf
+		Else
+			Return False
+		EndIf
+	EndIf
+EndFunc
+Func PieceKick(ByRef $Angle, ByRef $X, ByRef $Y, $Rotation)
+	Local $Piece = BagGetPiece()
+
+	If $Piece = 0 Then ;I piece
+		Switch $Rotation
+			Case 1 ;CCW
+				Local $Offset[4][4][2] = [ _
+				[[+2, 0],[-1, 0],[+2,-1],[-1,+2]], _
+				[[-1, 0],[+2, 0],[-1,-2],[+2,+1]], _
+				[[-2, 0],[+1, 0],[-2,+1],[+1,-2]], _
+				[[+1, 0],[-2, 0],[+1,+2],[-2,+1]]]
+			Case 3 ;CW
+				Local $Offset[4][4][2] = [ _
+				[[+1, 0],[-2, 0],[+1,+2],[-2,-1]], _
+				[[+2, 0],[-1, 0],[+2,-1],[-1,+2]], _
+				[[-1, 0],[+2, 0],[-1,-2],[+2,+1]], _
+				[[-2, 0],[+1, 0],[-2,+1],[+1,-2]]]
+			Case Else
+				Return False
+		EndSwitch
+	Else
+		Switch $Rotation
+			Case 1 ;CCW
+				Local $Offset[4][4][2] = [ _
+				[[+1, 0],[+1,+1],[ 0,-2],[+1,-2]], _
+				[[+1, 0],[+1,-1],[ 0,+2],[+1,+2]], _
+				[[-1, 0],[-1,+1],[ 0,-2],[-1,-2]], _
+				[[-1, 0],[-1,-1],[ 0,+2],[-1,+2]]]
+			Case 2 ;180
+				Local $Offset[4][5][2] = [ _
+				[[ 0,+1],[-1,+1],[+1,+1],[-1, 0],[+1, 0]], _
+				[[+1, 0],[+1,-2],[+1,-1],[ 0,-2],[ 0,-1]], _
+				[[ 0,-1],[+1,-1],[-1,-1],[+1, 0],[-1, 0]], _
+				[[-1, 0],[-1,+2],[-1,-1],[ 0,-2],[ 0,-1]]]
+			Case 3 ;CW
+				Local $Offset[4][4][2] = [ _
+				[[-1, 0],[-1,+1],[ 0,-2],[-1,-2]], _
+				[[+1, 0],[+1,-1],[ 0,+2],[+1,+2]], _
+				[[+1, 0],[+1,+1],[ 0,-2],[+1,-2]], _
+				[[-1, 0],[-1,-1],[ 0,+2],[-1,+2]]]
+			Case Else
+				Return False
+		EndSwitch
+	EndIf
+
+	For $i = 0 To UBound($Offset, 2) - 1
+		If PieceFits($Piece, $Angle, $X + $Offset[$Angle][$i][0], $Y + $Offset[$Angle][$i][1]) Then
+			$X += $Offset[$Angle][$i][0]
+			$Y += $Offset[$Angle][$i][1]
+			$lKick = $i
+			Return True
+		EndIf
+	Next
+
+	Return False
+EndFunc
+Func PieceFits($Piece, $Angle, $X, $Y)
+	Local $Shape = PieceGetShape($Piece, $Angle)
+	Local $i, $j
+
+	For $i = 0 To UBound($Shape, 1) - 1
+		For $j = 0 To UBound($Shape, 2) - 1
+			If BlockIsFull($GRID, $X+$i, $Y+$j) And $Shape[$i][$j] Then
+				Return False
+			EndIf
+		Next
+	Next
+
+	Return True
+EndFunc
 Func PieceFreeze(ByRef $GRID, $Piece, $Angle, $X, $Y)
 	Local $Shape = PieceGetShape($Piece, $Angle)
 	Local $i, $j
@@ -3296,10 +3414,10 @@ Func PieceFreeze(ByRef $GRID, $Piece, $Angle, $X, $Y)
 	Next
 EndFunc
 Func PieceGetName($Piece)
-	Local $Name[7] = ['I','J','S','O','Z','L','T']
+	Local $LOOKUP[7] = ['I','J','S','O','Z','L','T']
 	If $Piece < 0 Then Return '-'
 	If $Piece > 6 Then Return 'M'
-	Return $Name[$Piece]
+	Return $LOOKUP[$Piece]
 EndFunc
 Func PieceGetID($Piece)
 	Switch $Piece
