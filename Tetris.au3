@@ -121,7 +121,7 @@ Global $GarbageType   = StringSplit($GarbageString, ',', 2)
 Global $GarbageAlternates = True
 
 ;game variables
-Global Enum $GM_TRAINING, $GM_CHEESE, $GM_PC, $GM_FOUR, $GM_MASTER
+Global Enum $GM_TRAINING, $GM_CHEESE, $GM_PC, $GM_FOUR, $GM_MASTER, $GM_TOTAL
 Global $GAMEMODE   = 0
 Global $Gravity    = 0
 Global $Stickyness = 0
@@ -1159,7 +1159,7 @@ EndFunc
 
 
 Func SwitchMode()
-	SetMode(Mod($GAMEMODE+1, 5))
+	SetMode(Mod($GAMEMODE+1, $GM_TOTAL))
 EndFunc
 Func SetMode($Mode)
 	$GAMEMODE = $Mode
