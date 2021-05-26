@@ -121,7 +121,7 @@ Global $GarbageType   = StringSplit($GarbageString, ',', 2)
 Global $GarbageAlternates = True
 
 ;game variables
-Global Enum $GM_TRAINING, $GM_CHEESE, $GM_PC, $GM_FOUR, $GM_MASTER, $GM_TOTAL
+Global Enum $GM_TRAINING, $GM_CHEESE, $GM_FOUR, $GM_PC, $GM_MASTER, $GM_TOTAL
 Global $GAMEMODE   = 0
 Global $Gravity    = 0
 Global $Stickyness = 0
@@ -854,37 +854,32 @@ Func SetHotkeys($Flag = 0)
 EndFunc   ;==>SetHotkeys
 
 Func KeyProc($nCode, $wParam, $lParam)
-	;doesnt allow CTRL
-	;If $nCode >= 0 And $KEYACTIVE And Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000) Then
-
 	If $nCode >= 0 And $KEYACTIVE Then
 		Local $tKEYHOOKS = DllStructCreate($tagKBDLLHOOKSTRUCT, $lParam)
 		Local $vkCode    = DllStructGetData($tKEYHOOKS, 'vkCode')
 		Local $msgTime   = DllStructGetData($tKEYHOOKS, 'time')
 
 		;Only allows CTRL as a single Key
-		If $vkCode = 162 Or $vkCode = 163 Or Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000) Then
+		Local $CTRL = ($vkCode = 162 Or $vkCode = 163 Or Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000))
 
-			If $wParam = $WM_KEYDOWN Then
-				$LASTKEYPRESSED = $vkCode
+		If $wParam = $WM_KEYDOWN And $CTRL Then
+			$LASTKEYPRESSED = $vkCode
+			For $i = 0 To UBound($KEYBINDS) - 1
+				If Not $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
+					$KEYBINDS[$i][$KEYSTATE] = True
+					$KEYBINDS[$i][$KEYTIME ] = $msgTime
+					If Not $KEYBINDS[$i][$KEYEDGE] Then Execute($KEYBINDS[$i][$KEYACTION])
+				EndIf
+			Next
 
-				For $i = 0 To UBound($KEYBINDS) - 1
-					If Not $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
-						$KEYBINDS[$i][$KEYSTATE] = True
-						$KEYBINDS[$i][$KEYTIME ] = $msgTime
-						If Not $KEYBINDS[$i][$KEYEDGE] Then Execute($KEYBINDS[$i][$KEYACTION])
-					EndIf
-				Next
-
-			ElseIf $wParam = $WM_KEYUP Then
-				For $i = 0 To UBound($KEYBINDS) - 1
-					If $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
-						$KEYBINDS[$i][$KEYSTATE] = False
-						$KEYBINDS[$i][$KEYTIME ] = $msgTime
-						If $KEYBINDS[$i][$KEYEDGE] Then Execute($KEYBINDS[$i][$KEYACTION])
-					EndIf
-				Next
-			EndIf
+		ElseIf $wParam = $WM_KEYUP Then
+			For $i = 0 To UBound($KEYBINDS) - 1
+				If $KEYBINDS[$i][$KEYSTATE] And $KEYBINDS[$i][$KEYCODE] = $vkCode Then
+					$KEYBINDS[$i][$KEYSTATE] = False
+					$KEYBINDS[$i][$KEYTIME ] = $msgTime
+					If $KEYBINDS[$i][$KEYEDGE] And $CTRL Then Execute($KEYBINDS[$i][$KEYACTION])
+				EndIf
+			Next
 		EndIf
 	EndIf
 
