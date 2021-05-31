@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 #AutoIt3Wrapper_Compile_Both=y
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=Open source training tool for block-stacking games.
-#AutoIt3Wrapper_Res_Fileversion=1.5.0.0
+#AutoIt3Wrapper_Res_Fileversion=1.5.1.0
 #AutoIt3Wrapper_Res_LegalCopyright=Copyright (C) 2020  github.com/fiorescarlatto.
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -1937,7 +1937,7 @@ Func DrawComment($DRW, $Time = 0, $Title = '', $Comment = '')
 	;if ended draw taller
 	If $CommentInfo[4] Then
 		_WinAPI_FillRect ($DRW, Rect(10, $AlignB, $WSize[0]-20, 20), $Brush[$CBOX])
-		_WinAPI_FrameRect($DRW, Rect(10, $AlignB, $WSize[0]-20, 20), $Brush[$CTXT])
+		;_WinAPI_FrameRect($DRW, Rect(10, $AlignB, $WSize[0]-20, 20), $Brush[$CTXT])
 
 		_WinAPI_SelectObject($DRW, $Font9)
 		_WinAPI_SetBkColor  ($DRW, $Color[5])
@@ -1946,7 +1946,7 @@ Func DrawComment($DRW, $Time = 0, $Title = '', $Comment = '')
 		_WinAPI_DrawText($DRW, $CommentInfo[3], Rect(10, $AlignB, $WSize[0]-20, 20), $DT_CENTER)
 	Else
 		_WinAPI_FillRect ($DRW, Rect(10, $AlignB+10, $WSize[0]-20, 20), $Brush[$CBOX])
-		_WinAPI_FrameRect($DRW, Rect(10, $AlignB+10, $WSize[0]-20, 20), $Brush[$CTXT])
+		;_WinAPI_FrameRect($DRW, Rect(10, $AlignB+10, $WSize[0]-20, 20), $Brush[$CTXT])
 	EndIf
 
 
