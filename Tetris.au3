@@ -857,7 +857,11 @@ Func KeyProc($nCode, $wParam, $lParam)
 	If $nCode >= 0 And $KEYACTIVE Then
 		Local $tKEYHOOKS = DllStructCreate($tagKBDLLHOOKSTRUCT, $lParam)
 		Local $vkCode    = DllStructGetData($tKEYHOOKS, 'vkCode')
+		Local $scanCode  = DllStructGetData($tKEYHOOKS, 'scanCode')
 		Local $msgTime   = DllStructGetData($tKEYHOOKS, 'time')
+
+		;Avoid Weird Windows behaviour when hitting NUMPAD keys and SHIFT
+		If BitAND($scanCode, 512) Then Return _WinAPI_CallNextHookEx($KEYHOOK, $nCode, $wParam, $lParam)
 
 		;Only allows CTRL as a single Key
 		Local $CTRL = ($vkCode = 162 Or $vkCode = 163 Or Not BitAND(_WinAPI_GetAsyncKeyState(0x11), 0x8000))
