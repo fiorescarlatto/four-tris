@@ -2744,7 +2744,7 @@ Func PCSetLeftover($Leftover)
 			$Comment = $Leftover&'th.'
 	EndSwitch
 
-	DrawComment(0, 1000, $Comment&' PC', 'Bag leftover: '&$PCLeftover&' pieces.')
+	DrawComment(0, 1000, $Comment&' PC', 'Bag leftover: '&$PCLeftover&' piece' & (($PCLeftover = 1)?'.':'s.'))
 	clear_board()
 EndFunc
 Func PCSetBag($Leftover)
