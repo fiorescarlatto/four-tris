@@ -572,7 +572,7 @@ $SETTINGS[19][6] = 0
 #Region TESTING
 Func TestFunction()
 	If Not $DEBUG Then Return
-	TestPCBag()
+	HoldShuffle()
 EndFunc
 
 Func TestPCBag()
@@ -2821,7 +2821,7 @@ Func HoldShuffle()
 
 	If $PieceH <> -1 Then
 		$BagSeparator = BagGetSeparator()
-		__Swap($PieceH, $Bag[Random($BagSeparator[0], $BagSeparator[1], 1)])
+		__Swap($PieceH, $Bag[Random($BagSeparator[0], $BagSeparator[1] - 1, 1)])
 	EndIf
 
 	$CHG = True
