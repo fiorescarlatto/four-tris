@@ -1,3 +1,14 @@
+#Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_Icon=icon.ico
+#AutoIt3Wrapper_Outfile=build\current\four-tris-x86.exe
+#AutoIt3Wrapper_Outfile_x64=build\current\four-tris-x64.exe
+#AutoIt3Wrapper_Compile_Both=y
+#AutoIt3Wrapper_UseX64=y
+#AutoIt3Wrapper_Res_Comment=Open source training tool for block-stacking games.
+#AutoIt3Wrapper_Res_Description=four-tris
+#AutoIt3Wrapper_Res_Fileversion=1.5.2.0
+#AutoIt3Wrapper_Res_LegalCopyright=Copyright (C) 2020  github.com/fiorescarlatto.
+#EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #cs
 Copyright (C) 2020  github.com/fiorescarlatto
 
@@ -14,17 +25,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 #ce
-
-#Region ;**** Directives created by AutoIt3Wrapper_GUI ****
-#AutoIt3Wrapper_Icon=icon.ico
-#AutoIt3Wrapper_Outfile=build\current\four-tris-x86.exe
-#AutoIt3Wrapper_Outfile_x64=build\current\four-tris-x64.exe
-#AutoIt3Wrapper_Compile_Both=y
-#AutoIt3Wrapper_UseX64=y
-#AutoIt3Wrapper_Res_Description=Open source training tool for block-stacking games.
-#AutoIt3Wrapper_Res_Fileversion=1.5.1.0
-#AutoIt3Wrapper_Res_LegalCopyright=Copyright (C) 2020  github.com/fiorescarlatto.
-#EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #include <WinAPIGDI.au3>
 #include <WinAPISys.au3>
