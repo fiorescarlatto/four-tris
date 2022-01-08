@@ -104,7 +104,7 @@ Global $PieceH = -1
 Global $Swapped = False
 
 Global $Bag
-Global $BagSeed = Random(0, 65535, 1)
+Global $BagSeed = Random(0, 0x7fffffff, 1)
 Global $BagType = Number(IniRead('settings.ini', 'SETTINGS', 'BAG_TYPE', 0))
 Global $BagPieces[7] = [0,1,2,3,4,5,6]
 ;ensure standard bag-type
@@ -2175,7 +2175,7 @@ EndFunc
 Func __QueueEncode()
 	Local $S = ''
 
-	$S &= Hex($BagSeed, 4)
+	$S &= Hex($BagSeed, 8)
 	$S &= Hex($PieceH, 1)
 	For $i = 0 To UBound($Bag) - 1
 		$S &= Hex($Bag[$i], 1)
@@ -2194,16 +2194,16 @@ Func __QueueDecode($QueueData)
 	Local $Queue
 
 	$S = B64_Decode($QueueData)
-	$S = StringMid($S&'', 3)
+	$S = StringMid($S&'', 3) ; strip the leading '0x'
 
-	$Seed  = StringMid($S, 1, 4)
-	$Hold  = StringMid($S, 5, 1)
-	$Queue = StringMid($S, 6)
+	$Seed  = StringMid($S, 1, 8)
+	$Hold  = StringMid($S, 9, 1)
+	$Queue = StringMid($S, 10)
 	$Queue = StringRight($Queue, 1) = 'E' ? StringTrimRight($Queue, 1) : $Queue
 	$Queue = StringSplit($Queue, '', 2)
 
 	;check data is correct lengths
-	If StringLen($Seed) <> 4 Then Return
+	If StringLen($Seed) <> 8 Then Return
 	If StringLen($Hold) <> 1 Then Return
 
 	;conversts values to decimal
@@ -2775,7 +2775,7 @@ Func BagSeed()
 	SRandom($BagSeed)
 EndFunc
 Func BagReseed()
-	$BagSeed = Random(0, 65535, 1)
+	$BagSeed = BitAND($BagSeed*123456789 + 1, 0x7fffffff)
 EndFunc
 
 
