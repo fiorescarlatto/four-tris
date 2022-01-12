@@ -171,6 +171,7 @@ Global $REDO_MAX = 0
 
 ;timers
 Global $GTimer = TimerInit()
+Global $GlobalTime = 0
 Global $tInput   = 0
 Global $tGravity = 0
 Global $tSticky  = 0
@@ -758,15 +759,23 @@ While 1
 	Main()
 	DrawGame($DRW)
 
+	$GlobalTime = TimerDiff($GTimer)
+	#cs
 	While TimerDiff($GTimer) > $tInput
 		GameInput()
 		$tInput += 1000/60
 	WEnd
+	; Doesn't seem like there's a reason to run this at 60 Hz
+	; since it already uses loops to apply DAS and soft drop
+	; inside `GameInput`.
+	#ce
+	GameInput()
+	$tInput = $GlobalTime
 
-	While TimerDiff($GTimer) > $tGravity
+	While $GlobalTime > $tGravity
 		$tGravity += 1000 / $Gravity
 		If Not Tick() Then
-			If $tGravity < TimerDiff($GTimer) Then $tGravity = TimerDiff($GTimer)
+			If $tGravity < $GlobalTime Then $tGravity = $GlobalTime
 			ExitLoop
 		EndIf
 	WEnd
@@ -2543,10 +2552,14 @@ EndFunc
 Func GameInput()
 	Local Static $tSDS = 0
 
+	Local $Time = _WinAPI_GetTickCount()
+	Local $Diff
+
 	If Not $KEYBINDS[0][$KEYSTATE] And Not $KEYBINDS[1][$KEYSTATE] Then $DAS_DIR = ''
 	If $DAS_DIR = 'L' Then
 		If $KEYBINDS[0][$KEYSTATE] Then
-			While $KEYBINDS[0][$KEYTIME] + $DAS + $tARR < _WinAPI_GetTickCount()
+			$Diff = $Time - $KEYBINDS[0][$KEYTIME] - $DAS
+			While $tARR <= $Diff
 				If Not PieceMove(0,-1,0) Then ExitLoop
 				$tARR += $ARR
 				If $ARR > 15 Then Sound('move')
@@ -2561,7 +2574,8 @@ Func GameInput()
 
 	ElseIf $DAS_DIR = 'R' Then
 		If $KEYBINDS[1][$KEYSTATE] Then
-			While $KEYBINDS[1][$KEYTIME] + $DAS + $tARR < _WinAPI_GetTickCount()
+			$Diff = $Time - $KEYBINDS[1][$KEYTIME] - $DAS
+			While $tARR <= $Diff
 				If Not PieceMove(0,+1,0) Then ExitLoop
 				$tARR += $ARR
 				If $ARR > 15 Then Sound('move')
@@ -2577,7 +2591,8 @@ Func GameInput()
 
 	If Not $KEYBINDS[2][$KEYSTATE] Then $tSDS = 0
 	If $KEYBINDS[2][$KEYSTATE] Then
-		While $KEYBINDS[2][$KEYTIME] + $SDD + $tSDS < _WinAPI_GetTickCount()
+		$Diff = $Time - $KEYBINDS[2][$KEYTIME] - $SDD
+		While $tSDS <= $Diff
 			If Not PieceMove(0,0,+1) Then ExitLoop
 			$tSDS += $SDS
 		WEnd
@@ -2627,7 +2642,11 @@ Func MoveD()
 
 	$tSDS = 0
 
-	Return PieceMove(0, 0, +1)
+	PieceMove(0, 0, +1)
+	If $SDD = 0 And $SDS = 0 Then
+		Do
+		Until Not PieceMove(0, 0, +1)
+	EndIf
 EndFunc
 Func MoveU()
 	If $Lost Then Return
@@ -2889,9 +2908,10 @@ Func PieceReset()
 	$tSpin    = False
 
 	;resets all timers so that the piece will not teleport around
-	$KEYBINDS[0][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
-	$KEYBINDS[1][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
-	$KEYBINDS[2][$KEYTIME] = _WinAPI_GetTickCount() - $SDD
+	Local $Time = _WinAPI_GetTickCount()
+	$KEYBINDS[0][$KEYTIME] = $Time - $DAS
+	$KEYBINDS[1][$KEYTIME] = $Time - $DAS
+	$KEYBINDS[2][$KEYTIME] = $Time - $SDD
 	$tGravity = TimerDiff($GTimer) + (1000 / $Gravity)
 	$tARR = 0
 	$tSDS = 0
