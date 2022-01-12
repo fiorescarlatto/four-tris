@@ -2132,7 +2132,7 @@ Func StateEncode()
 	Local $QueueData = ''
 	Local $BoardData = ''
 
-	$QueueData = '[' & __QueueEncode() ;4 bits per piece + 16 bits (bag seed)
+	$QueueData = '[' & __QueueEncode() ;4 bits per piece + 32 bits (bag seed)
 	$BoardData = '[' & __BoardEncode() ;4 bits per block, compressed
 
 	Return $QueueData&$BoardData
