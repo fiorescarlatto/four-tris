@@ -26,6 +26,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 #ce
 
+#include <WinAPIConstants.au3>
 #include <WinAPIGDI.au3>
 #include <WinAPISys.au3>
 #include <WinAPIMisc.au3>
@@ -36,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 #include <Clipboard.au3>
 #include <Array.au3>
 #include <Color.au3>
+
 
 #include 'lib\Keyboard.au3'
 #include 'lib\Base64.au3'
@@ -370,7 +372,7 @@ Global $LASTKEYPRESSED = 0
 #EndRegion
 #Region BUTTONS
 ;standard buttons
-Global Enum $MODEBUTTON, $SETTBUTTON, $TESTBUTTON, _
+Global Enum $MODEBUTTON, $SETTBUTTON, $TESTBUTTON, $FUMEN, _
 			$HOLDBUTTON, $HOLDDELETE, $HOLDCHECK, _
 			$NEXTBUTTON, $SHUFBUTTON, _
 			$UNDOBUTTON, $REDOBUTTON, _
@@ -379,8 +381,8 @@ Global Enum $MODEBUTTON, $SETTBUTTON, $TESTBUTTON, _
 			$ACOLCHECK, _
 			$MIRRBUTTON
 
-Global $BUTTONS[15][3]
-Global $BUTTONTEXT[3] = ['TRAINING  MODE  ', '        SETTINGS', '          TEST  ']
+Global $BUTTONS[16][3]
+Global $BUTTONTEXT[4] = ['TRAINING  MODE  ', '        SETTINGS', '          TEST  ', '  F M N    U E  ']
 If Not $DEBUG Then ReDim $BUTTONTEXT[2]
 
 $BUTTONS[$TESTBUTTON][2] = BoundBox($AlignL, $AlignB - 120, 75, 35)
@@ -397,6 +399,7 @@ $BUTTONS[$UNDOBUTTON][2] = BoundBox($AlignR,      $AlignT + 250,  35,  35)
 $BUTTONS[$REDOBUTTON][2] = BoundBox($AlignR + 40, $AlignT + 250,  35,  35)
 $BUTTONS[$SNAPBUTTON][2] = BoundBox($AlignR,      $AlignB -  45,  75,  40)
 $BUTTONS[$MIRRBUTTON][2] = BoundBox($AlignR,      $AlignB -  90,  75,  40)
+$BUTTONS[$FUMEN][2] = BoundBox($AlignR,    $AlignB -  131,  75,  35)
 
 $BUTTONS[$HILIBUTTON][2] = BoundBox($AlignR, $AlignT + 295, 75, 35)
 $BUTTONS[$HCLRBUTTON][2] = BoundBox($AlignR, $AlignT + 335, 75, 35)
@@ -814,6 +817,7 @@ Func Main()
 			If $BUTTONS[$HOLDDELETE][0] Then Return HoldReset()
 			If $BUTTONS[$HOLDBUTTON][0] Then Return HoldSet()
 			If $BUTTONS[$SNAPBUTTON][0] Then Return SnapBoard()
+			If $BUTTONS[$FUMEN][0] Then Return Fumen()
 			If $BUTTONS[$MIRRBUTTON][0] Then Return GridMirror()
 			If $BUTTONS[$UNDOBUTTON][0] Then Return Undo()
 			If $BUTTONS[$REDOBUTTON][0] Then Return Redo()
@@ -2460,6 +2464,117 @@ Func SnapScreen()
 
 	Return $HSnap
 EndFunc
+
+
+Func _FumenValueEncode($value, $encodeNum)
+	Local $FumenDict[64] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/']
+	Local $temp = $FumenDict[Mod($value, 64)] 
+	For $i = 1 To $encodeNum - 1
+		$value = Int($value/64)
+		$temp &= $FumenDict[Mod($value, 64)]
+	Next
+	Return $temp
+EndFunc
+
+Func Fumen()
+	Local $FumenEncode = ""
+	Local $FumenUrl = "https://fumen.zui.jp/?v115@"
+	;~ 64 characters
+	;~ space, I, J, S, O, Z, L, T, garbage
+	Local $ColorToFumenColer = [0, 1, 6, 7, 3, 4, 2, 5, 8]
+
+	;~ board encoding
+	Local $curColor = 0
+	Local $curStart = 0
+	Local $curEnd = -1
+	For $j = 1 To UBound($GRID, 2) - 1
+		For $i = 0 To UBound($GRID, 1) - 1
+			$thisColor = $ColorToFumenColer[$GRID[$i][$j]]
+			If $thisColor <> $curColor Then
+				Local $cnt = $curEnd - $curStart
+				If $cnt >= 0 Then
+					Local $val = ($curColor + 8) * 240 + $cnt
+					$FumenEncode &= _FumenValueEncode($val, 2)
+				EndIf
+				$curColor = $thisColor
+				$curStart = $curEnd+1
+			EndIf
+			$curEnd += 1
+		Next
+	Next
+	if $curColor = 0 Then
+		$curEnd += 10
+	Else
+		Local $cnt = $curEnd - $curStart
+		Local $val = ($curColor + 8) * 240 + $cnt
+		$FumenEncode &= _FumenValueEncode($val, 2)
+		$curColor = 0
+		$curStart = $curEnd+1
+		$curEnd += 10
+	EndIf
+	Local $cnt = $curEnd - $curStart
+	Local $val = ($curColor + 8) * 240 + $cnt
+	$FumenEncode &= _FumenValueEncode($val, 2)
+
+	if $FumenEncode = "vh" Then
+		$FumenEncode &= "A"
+	EndIf
+
+	;~ flag encoding
+	;~ piece = none, rotation = 0, location = 0, raise = 0, mirror = 0, color = 1, comment = 1, lock = !1
+	Local $FumenFlagParam = [1, 8, 32, 7680, 15360, 30720, 61440, 122880]
+	;~ Local $FumenFlagValue = 0*$FumenFlagParam[0] + 0*$FumenFlagParam[1] + 0*$FumenFlagParam[2] + 0*$FumenFlagParam[3] + 0*$FumenFlagParam[4] + 1*$FumenFlagParam[5] + 0*$FumenFlagParam[6] + 0*$FumenFlagParam[7]
+	Local $FumenFlagValue = 1*$FumenFlagParam[5] + 1*$FumenFlagParam[6]
+	$FumenEncode &= _FumenValueEncode($FumenFlagValue, 3)
+	;~ queue encoding
+	;~ #Q=[]()
+	;~ # = 3, Q = 49, = = 29, [ = 59, ] = 61, ( = 8, ) = 9
+	Local $QueueCommentLenth = 7 + UBound($Bag)
+	If $PieceH <> -1 Then
+		$QueueCommentLenth += 1
+	EndIf
+	$FumenEncode &= _FumenValueEncode($QueueCommentLenth, 2)
+	;~ I, J, S, O, Z, L, T
+	Local $CaptionDict = [41, 42, 51, 47, 58, 44, 52]
+	Local $QueueInVal[$QueueCommentLenth]
+	Local $QueueIdx
+	$QueueInVal[0] = 3
+	$QueueInVal[1] = 49
+	$QueueInVal[2] = 29
+	$QueueInVal[3] = 59
+	If $PieceH <> -1 Then
+		$QueueInVal[4] = $CaptionDict[$PieceH]
+		$QueueInVal[5] = 61
+		$QueueIdx = 6
+	Else
+		$QueueInVal[4] = 61
+		$QueueIdx = 5
+	EndIf
+	$QueueInVal[$QueueIdx] = 8
+	$QueueInVal[$QueueIdx+1] = $CaptionDict[$Bag[0]]
+	$QueueInVal[$QueueIdx+2] = 9
+	$QueueIdx += 3
+	For $i = 1 To UBound($Bag) - 1
+		$QueueInVal[$QueueIdx] = $CaptionDict[$Bag[$i]]
+		$QueueIdx += 1
+	Next
+
+	Local $QueueVal = 0
+	Local $CaptionParam = [1, 96, 9216, 884736]
+	For $i = 0 To $QueueCommentLenth-1
+		Local $param = $CaptionParam[Mod($i,4)]
+		$QueueVal += $QueueInVal[$i] * $param
+		If Mod($i, 4) = 3 Then
+			$FumenEncode &= _FumenValueEncode($QueueVal, 5)
+			$QueueVal = 0
+		EndIf
+	Next
+	If $QueueVal > 0 Then
+		$FumenEncode &= _FumenValueEncode($QueueVal, 5)
+	EndIf
+	ShellExecute($FumenUrl & $FumenEncode)
+EndFunc
+
 Func SnapBoard()
 	Local $Snap
 
