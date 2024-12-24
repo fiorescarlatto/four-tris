@@ -2467,6 +2467,7 @@ EndFunc
 
 
 Func _FumenValueEncode($value, $encodeNum)
+	;~ 64 characters
 	Local $FumenDict[64] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/']
 	Local $temp = $FumenDict[Mod($value, 64)] 
 	For $i = 1 To $encodeNum - 1
@@ -2479,9 +2480,8 @@ EndFunc
 Func Fumen()
 	Local $FumenEncode = ""
 	Local $FumenUrl = "https://fumen.zui.jp/?v115@"
-	;~ 64 characters
 	;~ space, I, J, S, O, Z, L, T, garbage
-	Local $ColorToFumenColer = [0, 1, 6, 7, 3, 4, 2, 5, 8]
+	Local $ColorToFumenColor = [0, 1, 6, 7, 3, 4, 2, 5, 8]
 
 	;~ board encoding
 	Local $curColor = 0
@@ -2489,7 +2489,7 @@ Func Fumen()
 	Local $curEnd = -1
 	For $j = 1 To UBound($GRID, 2) - 1
 		For $i = 0 To UBound($GRID, 1) - 1
-			$thisColor = $ColorToFumenColer[$GRID[$i][$j]]
+			$thisColor = $ColorToFumenColor[$GRID[$i][$j]]
 			If $thisColor <> $curColor Then
 				Local $cnt = $curEnd - $curStart
 				If $cnt >= 0 Then
