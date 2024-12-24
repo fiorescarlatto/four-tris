@@ -372,7 +372,7 @@ Global $LASTKEYPRESSED = 0
 #EndRegion
 #Region BUTTONS
 ;standard buttons
-Global Enum $MODEBUTTON, $SETTBUTTON, $TESTBUTTON, $FUMEN, _
+Global Enum $MODEBUTTON, $SETTBUTTON, $FUMEN, $TESTBUTTON, _
 			$HOLDBUTTON, $HOLDDELETE, $HOLDCHECK, _
 			$NEXTBUTTON, $SHUFBUTTON, _
 			$UNDOBUTTON, $REDOBUTTON, _
@@ -382,8 +382,8 @@ Global Enum $MODEBUTTON, $SETTBUTTON, $TESTBUTTON, $FUMEN, _
 			$MIRRBUTTON
 
 Global $BUTTONS[16][3]
-Global $BUTTONTEXT[4] = ['TRAINING  MODE  ', '        SETTINGS', '          TEST  ', '  F M N    U E  ']
-If Not $DEBUG Then ReDim $BUTTONTEXT[2]
+Global $BUTTONTEXT[4] = ['TRAINING  MODE  ', '        SETTINGS', '  F M N    U E  ', '          TEST  ']
+If Not $DEBUG Then ReDim $BUTTONTEXT[3]
 
 $BUTTONS[$TESTBUTTON][2] = BoundBox($AlignL, $AlignB - 120, 75, 35)
 $BUTTONS[$MODEBUTTON][2] = BoundBox($AlignL, $AlignB -  80, 75, 35)
