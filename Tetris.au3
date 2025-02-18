@@ -2621,24 +2621,24 @@ Func FillBoardFromBitmap($Bitmap)
 			$RGB   = _ColorGetRGB(BitAND($Pixel, 0x00FFFFFF))
 			$HSV   = _ColorConvertRGBtoHSL($RGB)
 
-			If $HSV[2] > 50 Then
+			If $HSV[2] > 20 Then
 				If $HSV[1] < 20 Then
 					$GRID[$i][$j+$k] = 8
 				Else
 					Switch $HSV[0]
-						Case 220 To 240, 0 To 15 ;red
+						Case 0 To 15, 345 To 360 ;red
 							$GRID[$i][$j+$k] = 5
 						Case 15 To 27 ;orange
 							$GRID[$i][$j+$k] = 6
-						Case 27 To 45 ;yellow
+						Case 27 To 75 ;yellow
 							$GRID[$i][$j+$k] = 4
-						Case 45 To 100 ;green
+						Case 75 To 150 ;green
 							$GRID[$i][$j+$k] = 3
-						Case 100 To 135 ;cyan
+						Case 150 To 210 ;cyan
 							$GRID[$i][$j+$k] = 1
-						Case 135 To 175 ;blue
+						Case 210 To 270 ;blue
 							$GRID[$i][$j+$k] = 2
-						Case 175 To 220 ;magenta
+						Case 270 To 330 ;magenta
 							$GRID[$i][$j+$k] = 7
 						Case Else
 							$GRID[$i][$j+$k] = 8
