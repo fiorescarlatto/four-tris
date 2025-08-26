@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 #include <WinAPISys.au3>
 #include <WinAPIMisc.au3>
 #include <WindowsConstants.au3>
+#include <WinAPIConstants.au3>
 #include <BorderConstants.au3>
 #include <FontConstants.au3>
 #include <ScreenCapture.au3>
@@ -3831,5 +3832,6 @@ Func _LoadPng($FileName)
 
 	Return $HBITMAP
 EndFunc
+
 
 
