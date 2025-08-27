@@ -26,6 +26,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
 #ce
 
+#include <WinAPIConstants.au3>
 #include <WinAPIGDI.au3>
 #include <WinAPISys.au3>
 #include <WinAPIMisc.au3>
@@ -104,7 +105,7 @@ Global $PieceH = -1
 Global $Swapped = False
 
 Global $Bag
-Global $BagSeed = Random(0, 65535, 1)
+Global $BagSeed = Random(0, 0x7fffffff, 1)
 Global $BagType = Number(IniRead('settings.ini', 'SETTINGS', 'BAG_TYPE', 0))
 Global $BagPieces[7] = [0,1,2,3,4,5,6]
 ;ensure standard bag-type
@@ -171,6 +172,7 @@ Global $REDO_MAX = 0
 
 ;timers
 Global $GTimer = TimerInit()
+Global $GlobalTime = 0
 Global $tInput   = 0
 Global $tGravity = 0
 Global $tSticky  = 0
@@ -758,15 +760,23 @@ While 1
 	Main()
 	DrawGame($DRW)
 
+	$GlobalTime = TimerDiff($GTimer)
+	#cs
 	While TimerDiff($GTimer) > $tInput
 		GameInput()
 		$tInput += 1000/60
 	WEnd
+	; Doesn't seem like there's a reason to run this at 60 Hz
+	; since it already uses loops to apply DAS and soft drop
+	; inside `GameInput`.
+	#ce
+	GameInput()
+	$tInput = $GlobalTime
 
-	While TimerDiff($GTimer) > $tGravity
+	While $GlobalTime > $tGravity
 		$tGravity += 1000 / $Gravity
 		If Not Tick() Then
-			If $tGravity < TimerDiff($GTimer) Then $tGravity = TimerDiff($GTimer)
+			If $tGravity < $GlobalTime Then $tGravity = $GlobalTime
 			ExitLoop
 		EndIf
 	WEnd
@@ -2123,7 +2133,7 @@ Func StateEncode()
 	Local $QueueData = ''
 	Local $BoardData = ''
 
-	$QueueData = '[' & __QueueEncode() ;4 bits per piece + 16 bits (bag seed)
+	$QueueData = '[' & __QueueEncode() ;4 bits per piece + 32 bits (bag seed)
 	$BoardData = '[' & __BoardEncode() ;4 bits per block, compressed
 
 	Return $QueueData&$BoardData
@@ -2175,7 +2185,7 @@ EndFunc
 Func __QueueEncode()
 	Local $S = ''
 
-	$S &= Hex($BagSeed, 4)
+	$S &= Hex($BagSeed, 8)
 	$S &= Hex($PieceH, 1)
 	For $i = 0 To UBound($Bag) - 1
 		$S &= Hex($Bag[$i], 1)
@@ -2194,16 +2204,16 @@ Func __QueueDecode($QueueData)
 	Local $Queue
 
 	$S = B64_Decode($QueueData)
-	$S = StringMid($S&'', 3)
+	$S = StringMid($S&'', 3) ; strip the leading '0x'
 
-	$Seed  = StringMid($S, 1, 4)
-	$Hold  = StringMid($S, 5, 1)
-	$Queue = StringMid($S, 6)
+	$Seed  = StringMid($S, 1, 8)
+	$Hold  = StringMid($S, 9, 1)
+	$Queue = StringMid($S, 10)
 	$Queue = StringRight($Queue, 1) = 'E' ? StringTrimRight($Queue, 1) : $Queue
 	$Queue = StringSplit($Queue, '', 2)
 
 	;check data is correct lengths
-	If StringLen($Seed) <> 4 Then Return
+	If StringLen($Seed) <> 8 Then Return
 	If StringLen($Hold) <> 1 Then Return
 
 	;conversts values to decimal
@@ -2543,10 +2553,14 @@ EndFunc
 Func GameInput()
 	Local Static $tSDS = 0
 
+	Local $Time = _WinAPI_GetTickCount()
+	Local $Diff
+
 	If Not $KEYBINDS[0][$KEYSTATE] And Not $KEYBINDS[1][$KEYSTATE] Then $DAS_DIR = ''
 	If $DAS_DIR = 'L' Then
 		If $KEYBINDS[0][$KEYSTATE] Then
-			While $KEYBINDS[0][$KEYTIME] + $DAS + $tARR < _WinAPI_GetTickCount()
+			$Diff = $Time - $KEYBINDS[0][$KEYTIME] - $DAS
+			While $tARR <= $Diff
 				If Not PieceMove(0,-1,0) Then ExitLoop
 				$tARR += $ARR
 				If $ARR > 15 Then Sound('move')
@@ -2561,7 +2575,8 @@ Func GameInput()
 
 	ElseIf $DAS_DIR = 'R' Then
 		If $KEYBINDS[1][$KEYSTATE] Then
-			While $KEYBINDS[1][$KEYTIME] + $DAS + $tARR < _WinAPI_GetTickCount()
+			$Diff = $Time - $KEYBINDS[1][$KEYTIME] - $DAS
+			While $tARR <= $Diff
 				If Not PieceMove(0,+1,0) Then ExitLoop
 				$tARR += $ARR
 				If $ARR > 15 Then Sound('move')
@@ -2577,7 +2592,8 @@ Func GameInput()
 
 	If Not $KEYBINDS[2][$KEYSTATE] Then $tSDS = 0
 	If $KEYBINDS[2][$KEYSTATE] Then
-		While $KEYBINDS[2][$KEYTIME] + $SDD + $tSDS < _WinAPI_GetTickCount()
+		$Diff = $Time - $KEYBINDS[2][$KEYTIME] - $SDD
+		While $tSDS <= $Diff
 			If Not PieceMove(0,0,+1) Then ExitLoop
 			$tSDS += $SDS
 		WEnd
@@ -2627,7 +2643,11 @@ Func MoveD()
 
 	$tSDS = 0
 
-	Return PieceMove(0, 0, +1)
+	PieceMove(0, 0, +1)
+	If $SDD = 0 And $SDS = 0 Then
+		Do
+		Until Not PieceMove(0, 0, +1)
+	EndIf
 EndFunc
 Func MoveU()
 	If $Lost Then Return
@@ -2775,7 +2795,7 @@ Func BagSeed()
 	SRandom($BagSeed)
 EndFunc
 Func BagReseed()
-	$BagSeed = Random(0, 65535, 1)
+	$BagSeed = BitAND($BagSeed*123456789 + 1, 0x7fffffff)
 EndFunc
 
 
@@ -2889,9 +2909,10 @@ Func PieceReset()
 	$tSpin    = False
 
 	;resets all timers so that the piece will not teleport around
-	$KEYBINDS[0][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
-	$KEYBINDS[1][$KEYTIME] = _WinAPI_GetTickCount() - $DAS
-	$KEYBINDS[2][$KEYTIME] = _WinAPI_GetTickCount() - $SDD
+	Local $Time = _WinAPI_GetTickCount()
+	$KEYBINDS[0][$KEYTIME] = $Time - $DAS
+	$KEYBINDS[1][$KEYTIME] = $Time - $DAS
+	$KEYBINDS[2][$KEYTIME] = $Time - $SDD
 	$tGravity = TimerDiff($GTimer) + (1000 / $Gravity)
 	$tARR = 0
 	$tSDS = 0
